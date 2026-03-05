@@ -17,6 +17,7 @@ package main
 
 import (
 	"gumlet/cmd"
+	_ "gumlet/cmd/image"
 	_ "gumlet/cmd/purge"
 	_ "gumlet/cmd/video"
 )
