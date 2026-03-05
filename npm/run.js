@@ -1,0 +1,22 @@
+#!/usr/bin/env node
+// Thin wrapper that runs the downloaded gumlet binary.
+
+const { spawnSync } = require("child_process");
+const path = require("path");
+const fs = require("fs");
+
+const BIN_PATH = path.join(
+  __dirname,
+  "bin",
+  process.platform === "win32" ? "gumlet.exe" : "gumlet"
+);
+
+if (!fs.existsSync(BIN_PATH)) {
+  console.error(
+    "gumlet binary not found. Try reinstalling: npm install -g @gumlet/cli"
+  );
+  process.exit(1);
+}
+
+const result = spawnSync(BIN_PATH, process.argv.slice(2), { stdio: "inherit" });
+process.exit(result.status ?? 1);

@@ -1,0 +1,21 @@
+{
+  "name": "@gumlet/cli",
+  "version": "1.0.0",
+  "description": "Gumlet CLI – manage video and image assets from the command line",
+  "homepage": "https://www.gumlet.com",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gumlet/cli.git"
+  },
+  "keywords": ["gumlet", "cli", "video", "image", "cdn"],
+  "bin": {
+    "gumlet": "./run.js"
+  },
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}
