@@ -30,7 +30,7 @@ var getWorkspaceCmd = &cobra.Command{
 			return
 		}
 
-		printer.Print(resp, output)
+		printer.Print(resp, output, "id", "name", "type", "created_at", "updated_at")
 	},
 }
 
