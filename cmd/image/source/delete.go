@@ -1,4 +1,4 @@
-package image
+package source
 
 import (
 	"fmt"
@@ -9,8 +9,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var deleteSourceCmd = &cobra.Command{
-	Use:   "delete-source",
+var deleteCmd = &cobra.Command{
+	Use:   "delete",
 	Short: "Delete an image source",
 	Run: func(cmd *cobra.Command, args []string) {
 		sourceID, _ := cmd.Flags().GetString("source-id")
@@ -34,7 +34,7 @@ var deleteSourceCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(deleteSourceCmd)
-	deleteSourceCmd.Flags().String("source-id", "", "ID of the image source to delete")
-	deleteSourceCmd.MarkFlagRequired("source-id")
+	Cmd.AddCommand(deleteCmd)
+	deleteCmd.Flags().String("source-id", "", "ID of the image source to delete")
+	deleteCmd.MarkFlagRequired("source-id")
 }

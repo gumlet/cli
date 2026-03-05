@@ -1,4 +1,4 @@
-package purge
+package image
 
 import (
 	"fmt"
@@ -9,18 +9,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var purgeImageCacheCmd = &cobra.Command{
-	Use:   "image-cache",
-	Short: "Purge image cache",
+var purgeCmd = &cobra.Command{
+	Use:   "purge",
+	Short: "Purge image cache for a source",
 	Run: func(cmd *cobra.Command, args []string) {
 		subdomain, _ := cmd.Flags().GetString("subdomain")
 		urls, _ := cmd.Flags().GetStringSlice("urls")
+		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
 		body := map[string]interface{}{
 			"urls": urls,
 		}
-
-		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
 		apiClient, err := client.NewClient()
 		if err != nil {
@@ -40,8 +39,8 @@ var purgeImageCacheCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(purgeImageCacheCmd)
-	purgeImageCacheCmd.Flags().String("subdomain", "", "Subdomain to purge cache from")
-	purgeImageCacheCmd.MarkFlagRequired("subdomain")
-	purgeImageCacheCmd.Flags().StringSlice("urls", []string{}, "URLs to purge")
+	Cmd.AddCommand(purgeCmd)
+	purgeCmd.Flags().String("subdomain", "", "Subdomain to purge cache for")
+	purgeCmd.MarkFlagRequired("subdomain")
+	purgeCmd.Flags().StringSlice("urls", []string{}, "URLs to purge")
 }

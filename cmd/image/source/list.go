@@ -1,4 +1,4 @@
-package image
+package source
 
 import (
 	"fmt"
@@ -9,8 +9,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var listSourcesCmd = &cobra.Command{
-	Use:   "list-sources",
+var listCmd = &cobra.Command{
+	Use:   "list",
 	Short: "List all image sources",
 	Run: func(cmd *cobra.Command, args []string) {
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
@@ -32,5 +32,5 @@ var listSourcesCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(listSourcesCmd)
+	Cmd.AddCommand(listCmd)
 }

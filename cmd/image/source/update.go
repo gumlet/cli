@@ -1,4 +1,4 @@
-package image
+package source
 
 import (
 	"encoding/json"
@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var updateSourceCmd = &cobra.Command{
-	Use:   "update-source",
+var updateCmd = &cobra.Command{
+	Use:   "update",
 	Short: "Update an image source",
 	Run: func(cmd *cobra.Command, args []string) {
 		sourceID, _ := cmd.Flags().GetString("source-id")
@@ -20,11 +20,9 @@ var updateSourceCmd = &cobra.Command{
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
 		body := map[string]interface{}{}
-
 		if sourceType != "" {
 			body["type"] = sourceType
 		}
-
 		if configStr != "" {
 			var configObj map[string]interface{}
 			if err := json.Unmarshal([]byte(configStr), &configObj); err != nil {
@@ -49,14 +47,14 @@ var updateSourceCmd = &cobra.Command{
 			return
 		}
 
-		printer.Print(resp, output, "id", "name", "type", "updated_at")
+		printer.Print(resp, output, "id", "namespace", "type", "updated_at")
 	},
 }
 
 func init() {
-	Cmd.AddCommand(updateSourceCmd)
-	updateSourceCmd.Flags().String("source-id", "", "ID of the image source to update")
-	updateSourceCmd.MarkFlagRequired("source-id")
-	updateSourceCmd.Flags().String("type", "", "Source type: amazon, proxy, gcs, dostorage, wasabi, cloudinary, azure, linode, backblaze, cloudflare")
-	updateSourceCmd.Flags().String("config", "", "JSON config for the source type (e.g. '{\"bucket_name\":\"my-bucket\"}')")
+	Cmd.AddCommand(updateCmd)
+	updateCmd.Flags().String("source-id", "", "ID of the image source to update")
+	updateCmd.MarkFlagRequired("source-id")
+	updateCmd.Flags().String("type", "", "Source type: amazon, proxy, gcs, dostorage, wasabi, cloudinary, azure, linode, backblaze, cloudflare")
+	updateCmd.Flags().String("config", "", "JSON config for the source type")
 }

@@ -1,4 +1,4 @@
-package image
+package source
 
 import (
 	"encoding/json"
@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var createSourceCmd = &cobra.Command{
-	Use:   "create-source",
+var addCmd = &cobra.Command{
+	Use:   "add",
 	Short: "Create a new image source",
 	Run: func(cmd *cobra.Command, args []string) {
 		namespace, _ := cmd.Flags().GetString("namespace")
@@ -45,15 +45,15 @@ var createSourceCmd = &cobra.Command{
 			return
 		}
 
-		printer.Print(resp, output, "id", "name", "type", "created_at")
+		printer.Print(resp, output, "id", "namespace", "type", "created_at")
 	},
 }
 
 func init() {
-	Cmd.AddCommand(createSourceCmd)
-	createSourceCmd.Flags().String("namespace", "", "Subdomain for the image source (e.g. mycompany.gumlet.com)")
-	createSourceCmd.MarkFlagRequired("namespace")
-	createSourceCmd.Flags().String("type", "", "Source type: amazon, proxy, gcs, dostorage, wasabi, cloudinary, azure, linode, backblaze, cloudflare")
-	createSourceCmd.MarkFlagRequired("type")
-	createSourceCmd.Flags().String("config", "", "JSON config for the source type (e.g. '{\"bucket_name\":\"my-bucket\",\"bucket_region\":\"us-east-1\"}')")
+	Cmd.AddCommand(addCmd)
+	addCmd.Flags().String("namespace", "", "Subdomain for the image source (e.g. mycompany.gumlet.com)")
+	addCmd.MarkFlagRequired("namespace")
+	addCmd.Flags().String("type", "", "Source type: amazon, proxy, gcs, dostorage, wasabi, cloudinary, azure, linode, backblaze, cloudflare")
+	addCmd.MarkFlagRequired("type")
+	addCmd.Flags().String("config", "", "JSON config for the source type (e.g. '{\"bucket_name\":\"my-bucket\",\"bucket_region\":\"us-east-1\"}')")
 }
