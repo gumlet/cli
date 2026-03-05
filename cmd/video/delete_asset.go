@@ -3,8 +3,10 @@ package video
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"gumlet/pkg/client"
+	"gumlet/pkg/printer"
+
+	"github.com/spf13/cobra"
 )
 
 var deleteAssetCmd = &cobra.Command{
@@ -14,20 +16,22 @@ var deleteAssetCmd = &cobra.Command{
 		workspaceID, _ := cmd.Flags().GetString("workspace-id")
 		assetID, _ := cmd.Flags().GetString("asset-id")
 
-		client, err := client.NewClient()
+		output, _ := cmd.Root().PersistentFlags().GetString("output")
+
+		apiClient, err := client.NewClient()
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 
 		path := fmt.Sprintf("/video/assets/%s/%s", workspaceID, assetID)
-		resp, err := client.Delete(path)
+		resp, err := apiClient.Delete(path)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 
-		fmt.Println(string(resp))
+		printer.Print(resp, output)
 	},
 }
 

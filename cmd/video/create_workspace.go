@@ -3,8 +3,10 @@ package video
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"gumlet/pkg/client"
+	"gumlet/pkg/printer"
+
+	"github.com/spf13/cobra"
 )
 
 var createWorkspaceCmd = &cobra.Command{
@@ -17,19 +19,21 @@ var createWorkspaceCmd = &cobra.Command{
 			"name": name,
 		}
 
-		client, err := client.NewClient()
+		output, _ := cmd.Root().PersistentFlags().GetString("output")
+
+		apiClient, err := client.NewClient()
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 
-		resp, err := client.Post("/video/workspaces", body)
+		resp, err := apiClient.Post("/video/workspaces", body)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 
-		fmt.Println(string(resp))
+		printer.Print(resp, output)
 	},
 }
 

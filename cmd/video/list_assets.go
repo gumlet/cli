@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"gumlet/pkg/client"
+	"gumlet/pkg/printer"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -14,8 +15,9 @@ var listAssetsCmd = &cobra.Command{
 	Short: "List assets in a video workspace",
 	Run: func(cmd *cobra.Command, args []string) {
 		workspaceID, _ := cmd.Flags().GetString("workspace-id")
+		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
-		client, err := client.NewClient()
+		apiClient, err := client.NewClient()
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -30,13 +32,13 @@ var listAssetsCmd = &cobra.Command{
 			}
 		})
 
-		resp, err := client.Get(path, queryParams)
+		resp, err := apiClient.Get(path, queryParams)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 
-		fmt.Println(string(resp))
+		printer.Print(resp, output)
 	},
 }
 

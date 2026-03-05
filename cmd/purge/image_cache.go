@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"gumlet/pkg/client"
+	"gumlet/pkg/printer"
 
 	"github.com/spf13/cobra"
 )
@@ -19,20 +20,22 @@ var purgeImageCacheCmd = &cobra.Command{
 			"urls": urls,
 		}
 
-		client, err := client.NewClient()
+		output, _ := cmd.Root().PersistentFlags().GetString("output")
+
+		apiClient, err := client.NewClient()
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 
 		path := fmt.Sprintf("/purge/%s", subdomain)
-		resp, err := client.Post(path, body)
+		resp, err := apiClient.Post(path, body)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 
-		fmt.Println(string(resp))
+		printer.Print(resp, output)
 	},
 }
 
