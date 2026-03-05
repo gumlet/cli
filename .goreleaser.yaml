@@ -68,4 +68,3 @@ homebrew_casks:
     homepage: https://www.gumlet.com
     description: Gumlet CLI – manage video and image assets from the command line
     license: Apache-2.0
-    binary: gumlet
