@@ -38,6 +38,12 @@ tar -xzf gumlet_darwin_arm64.tar.gz
 sudo mv gumlet /usr/local/bin/
 ```
 
+> **macOS Gatekeeper note:** If macOS blocks the binary with _"cannot be opened because the developer cannot be verified"_, remove the quarantine attribute:
+> ```sh
+> xattr -d com.apple.quarantine /usr/local/bin/gumlet
+> ```
+> Alternatively, open **System Settings → Privacy & Security** and click **Allow Anyway**. This is only needed for direct downloads — the Homebrew and npm installs handle this automatically.
+
 ---
 
 ## Authentication

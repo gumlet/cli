@@ -12,7 +12,7 @@ permissions:
 jobs:
   goreleaser:
     name: Build & Release
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,6 +33,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
+          MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_SIGN_PASSWORD }}
+          NOTARIZE_ISSUER_ID: ${{ secrets.NOTARIZE_ISSUER_ID }}
+          NOTARIZE_KEY_ID: ${{ secrets.NOTARIZE_KEY_ID }}
+          NOTARIZE_KEY: ${{ secrets.NOTARIZE_KEY }}
 
   npm-publish:
     name: Publish npm package
