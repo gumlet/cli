@@ -1,4 +1,4 @@
-package video
+package asset
 
 import (
 	"fmt"
@@ -9,12 +9,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var assetDetailsCmd = &cobra.Command{
-	Use:   "asset-details",
+var getCmd = &cobra.Command{
+	Use:   "get",
 	Short: "Get details of a video asset",
 	Run: func(cmd *cobra.Command, args []string) {
 		assetID, _ := cmd.Flags().GetString("asset-id")
-
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
 		apiClient, err := client.NewClient()
@@ -35,7 +34,7 @@ var assetDetailsCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(assetDetailsCmd)
-	assetDetailsCmd.Flags().String("asset-id", "", "ID of the asset")
-	assetDetailsCmd.MarkFlagRequired("asset-id")
+	Cmd.AddCommand(getCmd)
+	getCmd.Flags().String("asset-id", "", "ID of the asset")
+	getCmd.MarkFlagRequired("asset-id")
 }

@@ -1,4 +1,4 @@
-package video
+package playlist
 
 import (
 	"fmt"
@@ -9,8 +9,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var createPlaylistCmd = &cobra.Command{
-	Use:   "create-playlist",
+var createCmd = &cobra.Command{
+	Use:   "create",
 	Short: "Create a new playlist",
 	Run: func(cmd *cobra.Command, args []string) {
 		collectionID, _ := cmd.Flags().GetString("workspace-id")
@@ -41,10 +41,10 @@ var createPlaylistCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(createPlaylistCmd)
-	createPlaylistCmd.Flags().String("workspace-id", "", "Workspace (collection) ID for the playlist")
-	createPlaylistCmd.MarkFlagRequired("workspace-id")
-	createPlaylistCmd.Flags().String("title", "", "Title of the playlist")
-	createPlaylistCmd.MarkFlagRequired("title")
-	createPlaylistCmd.Flags().String("description", "", "Description of the playlist")
+	Cmd.AddCommand(createCmd)
+	createCmd.Flags().String("workspace-id", "", "Workspace (collection) ID for the playlist")
+	createCmd.MarkFlagRequired("workspace-id")
+	createCmd.Flags().String("title", "", "Title of the playlist")
+	createCmd.MarkFlagRequired("title")
+	createCmd.Flags().String("description", "", "Description of the playlist")
 }

@@ -1,4 +1,4 @@
-package video
+package playlist
 
 import (
 	"fmt"
@@ -9,8 +9,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var listPlaylistsCmd = &cobra.Command{
-	Use:   "list-playlists",
+var listCmd = &cobra.Command{
+	Use:   "list",
 	Short: "List all playlists",
 	Run: func(cmd *cobra.Command, args []string) {
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
@@ -32,5 +32,5 @@ var listPlaylistsCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(listPlaylistsCmd)
+	Cmd.AddCommand(listCmd)
 }

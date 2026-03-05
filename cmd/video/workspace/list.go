@@ -1,4 +1,4 @@
-package video
+package workspace
 
 import (
 	"fmt"
@@ -9,16 +9,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var createWorkspaceCmd = &cobra.Command{
-	Use:   "create-workspace",
-	Short: "Create a new video workspace",
+var listCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List all video workspaces",
 	Run: func(cmd *cobra.Command, args []string) {
-		name, _ := cmd.Flags().GetString("name")
-
-		body := map[string]interface{}{
-			"name": name,
-		}
-
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
 		apiClient, err := client.NewClient()
@@ -27,7 +21,7 @@ var createWorkspaceCmd = &cobra.Command{
 			return
 		}
 
-		resp, err := apiClient.Post("/video/workspaces", body)
+		resp, err := apiClient.Get("/video/workspaces", nil)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -38,7 +32,5 @@ var createWorkspaceCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(createWorkspaceCmd)
-	createWorkspaceCmd.Flags().String("name", "", "Name of the new workspace")
-	createWorkspaceCmd.MarkFlagRequired("name")
+	Cmd.AddCommand(listCmd)
 }

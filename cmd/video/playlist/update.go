@@ -1,4 +1,4 @@
-package video
+package playlist
 
 import (
 	"fmt"
@@ -9,8 +9,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var updatePlaylistCmd = &cobra.Command{
-	Use:   "update-playlist",
+var updateCmd = &cobra.Command{
+	Use:   "update",
 	Short: "Update a playlist",
 	Run: func(cmd *cobra.Command, args []string) {
 		playlistID, _ := cmd.Flags().GetString("playlist-id")
@@ -48,10 +48,10 @@ var updatePlaylistCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(updatePlaylistCmd)
-	updatePlaylistCmd.Flags().String("playlist-id", "", "ID of the playlist to update")
-	updatePlaylistCmd.MarkFlagRequired("playlist-id")
-	updatePlaylistCmd.Flags().String("title", "", "New title for the playlist")
-	updatePlaylistCmd.Flags().String("description", "", "New description for the playlist")
-	updatePlaylistCmd.Flags().String("channel-visibility", "", "Channel visibility setting")
+	Cmd.AddCommand(updateCmd)
+	updateCmd.Flags().String("playlist-id", "", "ID of the playlist to update")
+	updateCmd.MarkFlagRequired("playlist-id")
+	updateCmd.Flags().String("title", "", "New title for the playlist")
+	updateCmd.Flags().String("description", "", "New description for the playlist")
+	updateCmd.Flags().String("channel-visibility", "", "Channel visibility setting")
 }

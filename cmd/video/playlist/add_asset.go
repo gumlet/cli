@@ -1,4 +1,4 @@
-package video
+package playlist
 
 import (
 	"fmt"
@@ -9,16 +9,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var removePlaylistAssetCmd = &cobra.Command{
-	Use:   "remove-playlist-asset",
-	Short: "Remove assets from a playlist",
+var addAssetCmd = &cobra.Command{
+	Use:   "add-asset",
+	Short: "Add assets to a playlist",
 	Run: func(cmd *cobra.Command, args []string) {
 		playlistID, _ := cmd.Flags().GetString("playlist-id")
 		assetIDs, _ := cmd.Flags().GetStringSlice("asset-ids")
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
 		body := map[string]interface{}{
-			"delete_list": assetIDs,
+			"asset_list": assetIDs,
 		}
 
 		apiClient, err := client.NewClient()
@@ -28,7 +28,7 @@ var removePlaylistAssetCmd = &cobra.Command{
 		}
 
 		path := fmt.Sprintf("/video/playlist/%s/asset", playlistID)
-		resp, err := apiClient.DeleteWithBody(path, body)
+		resp, err := apiClient.Post(path, body)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -39,9 +39,9 @@ var removePlaylistAssetCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(removePlaylistAssetCmd)
-	removePlaylistAssetCmd.Flags().String("playlist-id", "", "ID of the playlist")
-	removePlaylistAssetCmd.MarkFlagRequired("playlist-id")
-	removePlaylistAssetCmd.Flags().StringSlice("asset-ids", []string{}, "Asset IDs to remove from the playlist")
-	removePlaylistAssetCmd.MarkFlagRequired("asset-ids")
+	Cmd.AddCommand(addAssetCmd)
+	addAssetCmd.Flags().String("playlist-id", "", "ID of the playlist")
+	addAssetCmd.MarkFlagRequired("playlist-id")
+	addAssetCmd.Flags().StringSlice("asset-ids", []string{}, "Asset IDs to add to the playlist")
+	addAssetCmd.MarkFlagRequired("asset-ids")
 }

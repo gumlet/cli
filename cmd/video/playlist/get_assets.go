@@ -1,4 +1,4 @@
-package video
+package playlist
 
 import (
 	"fmt"
@@ -9,8 +9,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var getPlaylistAssetsCmd = &cobra.Command{
-	Use:   "get-playlist-assets",
+var getAssetsCmd = &cobra.Command{
+	Use:   "get-assets",
 	Short: "Get assets in a playlist",
 	Run: func(cmd *cobra.Command, args []string) {
 		playlistID, _ := cmd.Flags().GetString("playlist-id")
@@ -34,7 +34,7 @@ var getPlaylistAssetsCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(getPlaylistAssetsCmd)
-	getPlaylistAssetsCmd.Flags().String("playlist-id", "", "ID of the playlist")
-	getPlaylistAssetsCmd.MarkFlagRequired("playlist-id")
+	Cmd.AddCommand(getAssetsCmd)
+	getAssetsCmd.Flags().String("playlist-id", "", "ID of the playlist")
+	getAssetsCmd.MarkFlagRequired("playlist-id")
 }

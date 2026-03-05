@@ -1,4 +1,4 @@
-package video
+package workspace
 
 import (
 	"fmt"
@@ -9,12 +9,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var getWorkspaceCmd = &cobra.Command{
-	Use:   "get-workspace",
+var getCmd = &cobra.Command{
+	Use:   "get",
 	Short: "Get details of a video workspace",
 	Run: func(cmd *cobra.Command, args []string) {
 		workspaceID, _ := cmd.Flags().GetString("workspace-id")
-
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
 		apiClient, err := client.NewClient()
@@ -35,7 +34,7 @@ var getWorkspaceCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(getWorkspaceCmd)
-	getWorkspaceCmd.Flags().String("workspace-id", "", "ID of the workspace")
-	getWorkspaceCmd.MarkFlagRequired("workspace-id")
+	Cmd.AddCommand(getCmd)
+	getCmd.Flags().String("workspace-id", "", "ID of the workspace")
+	getCmd.MarkFlagRequired("workspace-id")
 }
