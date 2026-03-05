@@ -104,6 +104,14 @@ func (c *Client) Delete(path string) ([]byte, error) {
 	return c.Do(req)
 }
 
+func (c *Client) DeleteWithBody(path string, body interface{}) ([]byte, error) {
+	req, err := c.newRequest("DELETE", path, body)
+	if err != nil {
+		return nil, err
+	}
+	return c.Do(req)
+}
+
 func (c *Client) Put(path string, body interface{}) ([]byte, error) {
 	req, err := c.newRequest("PUT", path, body)
 	if err != nil {
