@@ -28,7 +28,7 @@ func printJSON(data []byte, fields []string) error {
 		return nil
 	}
 	if len(fields) > 0 {
-		v = filterValue(v, fields)
+		v = filterByFields(v, fields)
 	}
 	out, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
@@ -37,6 +37,35 @@ func printJSON(data []byte, fields []string) error {
 	}
 	fmt.Println(string(out))
 	return nil
+}
+
+// filterByFields filters a decoded JSON value to only the requested field paths,
+// flattening dot-notation paths to their label (last segment).
+func filterByFields(v interface{}, fields []string) interface{} {
+	switch val := v.(type) {
+	case map[string]interface{}:
+		out := make(map[string]interface{}, len(fields))
+		for _, f := range fields {
+			extracted := extractField(val, f)
+			if extracted != nil {
+				out[fieldLabel(f)] = extracted
+			}
+		}
+		// If none of the fields matched directly, recurse into array values
+		if len(out) == 0 {
+			for k, child := range val {
+				val[k] = filterByFields(child, fields)
+			}
+			return val
+		}
+		return out
+	case []interface{}:
+		for i, item := range val {
+			val[i] = filterByFields(item, fields)
+		}
+		return val
+	}
+	return v
 }
 
 func printTable(data []byte, fields []string) error {
@@ -50,7 +79,15 @@ func printTable(data []byte, fields []string) error {
 	case []interface{}:
 		return renderSlice(v, fields)
 	case map[string]interface{}:
-		// Find the largest array value inside the object
+		// If any requested field resolves on this object, render it as key-value
+		if len(fields) > 0 {
+			for _, f := range fields {
+				if extractField(v, f) != nil {
+					return renderKeyValue(v, fields)
+				}
+			}
+		}
+		// Otherwise find the largest array value inside the object
 		var best []interface{}
 		for _, val := range v {
 			if arr, ok := val.([]interface{}); ok && len(arr) > len(best) {
@@ -84,7 +121,11 @@ func renderSlice(rows []interface{}, fields []string) error {
 	headers := resolveFields(firstObj, fields)
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, strings.Join(headers, "\t"))
+	displayHeaders := make([]string, len(headers))
+	for i, h := range headers {
+		displayHeaders[i] = fieldLabel(h)
+	}
+	fmt.Fprintln(w, strings.Join(displayHeaders, "\t"))
 	fmt.Fprintln(w, strings.Join(repeatStr("---", len(headers)), "\t"))
 
 	for _, row := range rows {
@@ -94,7 +135,7 @@ func renderSlice(rows []interface{}, fields []string) error {
 		}
 		vals := make([]string, len(headers))
 		for i, h := range headers {
-			vals[i] = truncate(cellString(obj[h]), maxCellWidth)
+			vals[i] = truncate(cellString(extractField(obj, h)), maxCellWidth)
 		}
 		fmt.Fprintln(w, strings.Join(vals, "\t"))
 	}
@@ -107,19 +148,18 @@ func renderKeyValue(obj map[string]interface{}, fields []string) error {
 	fmt.Fprintln(w, "KEY\tVALUE")
 	fmt.Fprintln(w, "---\t-----")
 	for _, k := range keys {
-		fmt.Fprintf(w, "%s\t%s\n", k, truncate(cellString(obj[k]), maxCellWidth))
+		fmt.Fprintf(w, "%s\t%s\n", fieldLabel(k), truncate(cellString(extractField(obj, k)), maxCellWidth))
 	}
 	return w.Flush()
 }
 
 // resolveFields returns the display fields: the provided list if non-empty,
-// otherwise all keys from the object.
+// otherwise all top-level keys from the object.
 func resolveFields(obj map[string]interface{}, fields []string) []string {
 	if len(fields) > 0 {
-		// Only include fields that actually exist in the object
 		out := make([]string, 0, len(fields))
 		for _, f := range fields {
-			if _, ok := obj[f]; ok {
+			if extractField(obj, f) != nil {
 				out = append(out, f)
 			}
 		}
@@ -134,34 +174,27 @@ func resolveFields(obj map[string]interface{}, fields []string) []string {
 	return keys
 }
 
-// filterValue filters a JSON-decoded value to only include the given fields.
-func filterValue(v interface{}, fields []string) interface{} {
-	switch val := v.(type) {
-	case map[string]interface{}:
-		// Check if any of the fields exist directly; if so, filter this object
-		for _, f := range fields {
-			if _, ok := val[f]; ok {
-				out := make(map[string]interface{}, len(fields))
-				for _, f2 := range fields {
-					if fv, ok := val[f2]; ok {
-						out[f2] = fv
-					}
-				}
-				return out
-			}
-		}
-		// Fields not at this level — recurse into values to find arrays
-		for k, child := range val {
-			val[k] = filterValue(child, fields)
-		}
-		return val
-	case []interface{}:
-		for i, item := range val {
-			val[i] = filterValue(item, fields)
-		}
+// extractField retrieves a value from obj using a dot-notation path (e.g. "input.title").
+func extractField(obj map[string]interface{}, path string) interface{} {
+	parts := strings.SplitN(path, ".", 2)
+	val, ok := obj[parts[0]]
+	if !ok {
+		return nil
+	}
+	if len(parts) == 1 {
 		return val
 	}
-	return v
+	nested, ok := val.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	return extractField(nested, parts[1])
+}
+
+// fieldLabel returns the last segment of a dot-notation path as the column header.
+func fieldLabel(path string) string {
+	parts := strings.Split(path, ".")
+	return parts[len(parts)-1]
 }
 
 // cellString converts a value to a display string, rendering nested objects as compact JSON.

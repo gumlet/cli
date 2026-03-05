@@ -38,7 +38,7 @@ var listAssetsCmd = &cobra.Command{
 			return
 		}
 
-		printer.Print(resp, output, "asset_id", "status", "created_at", "tag", "folder")
+		printer.Print(resp, output, "asset_id", "input.title", "status", "created_at", "tag")
 	},
 }
 
