@@ -9,7 +9,7 @@ Command-line interface for managing [Gumlet](https://www.gumlet.com) video and i
 ### Homebrew (macOS / Linux)
 
 ```sh
-brew install gumlet/tap/gumlet
+brew install --cask gumlet/tap/gumlet
 ```
 
 ### npm (macOS / Linux / Windows)

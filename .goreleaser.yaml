@@ -35,7 +35,7 @@ archives:
       {{- else }}{{ .Arch }}{{ end }}
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
 
 checksum:
   name_template: checksums.txt
@@ -58,17 +58,16 @@ release:
   prerelease: auto
   name_template: "v{{.Version}}"
 
-brews:
+homebrew_casks:
   - name: gumlet
     repository:
       owner: gumlet
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    directory: Formula
+    directory: Casks
     homepage: https://www.gumlet.com
     description: Gumlet CLI – manage video and image assets from the command line
     license: Apache-2.0
-    install: |
-      bin.install "gumlet"
-    test: |
-      system "#{bin}/gumlet", "--help"
+    binary: gumlet
+    manpage: ""
+    completions: []
