@@ -95,3 +95,19 @@ func (c *Client) Post(path string, body interface{}) ([]byte, error) {
 	}
 	return c.Do(req)
 }
+
+func (c *Client) Delete(path string) ([]byte, error) {
+	req, err := c.newRequest("DELETE", path, nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.Do(req)
+}
+
+func (c *Client) Put(path string, body interface{}) ([]byte, error) {
+	req, err := c.newRequest("PUT", path, body)
+	if err != nil {
+		return nil, err
+	}
+	return c.Do(req)
+}
