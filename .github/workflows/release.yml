@@ -6,7 +6,8 @@ on:
       - "v*"
 
 permissions:
-  contents: write
+  id-token: write # This is required for requesting the JWT
+  contents: write 
 
 jobs:
   goreleaser:
@@ -44,7 +45,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
       - name: Set version from tag
@@ -53,7 +54,5 @@ jobs:
           npm --prefix npm version $VERSION --no-git-tag-version
 
       - name: Publish to npm
-        run: npm publish --access public
+        run: npm publish
         working-directory: npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
