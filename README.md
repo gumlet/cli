@@ -281,6 +281,38 @@ gumlet image source list --output table
 
 ---
 
+## AI Agent Skills
+
+Gumlet CLI ships with [skills.sh](https://skills.sh) skill definitions so AI agents (Claude, Windsurf, Cursor, etc.) can discover and invoke CLI commands automatically.
+
+### Install a skill
+
+```sh
+npx skills add https://github.com/gumlet/cli -skill gumlet-video-asset
+```
+
+Available skills:
+
+| Skill | Description |
+|---|---|
+| `gumlet-video-workspace` | List, create, update, and delete video workspaces |
+| `gumlet-video-asset` | List, get, and delete video assets |
+| `gumlet-video-asset-upload` | Upload a local video file to Gumlet |
+| `gumlet-video-playlist` | Manage playlists and their assets |
+| `gumlet-image-source` | Manage image sources (S3, GCS, proxy, etc.) |
+| `gumlet-image-purge` | Purge CDN cache for an image source |
+
+### Validate skills locally
+
+```sh
+npx skills-ref validate ./skills/gumlet-video-workspace
+npx skills-ref validate ./skills/gumlet-video-asset-upload
+```
+
+> Skills are published at [skills.sh/gumlet/cli](https://skills.sh/gumlet/cli).
+
+---
+
 ## License
 
 Apache 2.0 © [Gumlet Pte. Ltd.](https://www.gumlet.com)
