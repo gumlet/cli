@@ -29,7 +29,7 @@ var getCmd = &cobra.Command{
 			return
 		}
 
-		printer.Print(resp, output, "asset_id", "input.title", "status", "created_at", "updated_at", "tag", "collection_id")
+		printer.Print(resp, output, "asset_id", "input.title", "output.playback_url", "output.thumbnail_url", "status", "created_at", "updated_at", "tag", "collection_id")
 	},
 }
 

@@ -166,7 +166,7 @@ func renderKeyValue(obj map[string]interface{}, fields []string) error {
 	fmt.Fprintln(w, "KEY\tVALUE")
 	fmt.Fprintln(w, "---\t-----")
 	for _, k := range keys {
-		fmt.Fprintf(w, "%s\t%s\n", fieldLabel(k), truncate(cellString(extractField(obj, k)), maxCellWidth))
+		fmt.Fprintf(w, "%s\t%s\n", fieldLabel(k), cellString(extractField(obj, k)))
 	}
 	return w.Flush()
 }
