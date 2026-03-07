@@ -27,7 +27,7 @@ var listCmd = &cobra.Command{
 			return
 		}
 
-		printer.Print(resp, output, "id", "namespace", "type", "created_at")
+		printer.Print(resp, output, "id", "namespace", "type", "cname", "created_at")
 	},
 }
 

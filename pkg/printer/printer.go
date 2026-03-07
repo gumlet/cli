@@ -175,15 +175,7 @@ func renderKeyValue(obj map[string]interface{}, fields []string) error {
 // otherwise all top-level keys from the object.
 func resolveFields(obj map[string]interface{}, fields []string) []string {
 	if len(fields) > 0 {
-		out := make([]string, 0, len(fields))
-		for _, f := range fields {
-			if extractField(obj, f) != nil {
-				out = append(out, f)
-			}
-		}
-		if len(out) > 0 {
-			return out
-		}
+		return fields
 	}
 	keys := make([]string, 0, len(obj))
 	for k := range obj {
