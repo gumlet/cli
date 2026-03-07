@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/spf13/viper"
 )
@@ -118,4 +121,43 @@ func (c *Client) Put(path string, body interface{}) ([]byte, error) {
 		return nil, err
 	}
 	return c.Do(req)
+}
+
+// PutFile streams a local file to a pre-signed URL (e.g. S3) using a plain PUT.
+// No Gumlet auth header is added — the URL is self-authorising.
+func (c *Client) PutFile(uploadURL, filePath string) error {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("cannot open file: %w", err)
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil {
+		return fmt.Errorf("cannot stat file: %w", err)
+	}
+
+	contentType := mime.TypeByExtension(filepath.Ext(filePath))
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	req, err := http.NewRequest("PUT", uploadURL, f)
+	if err != nil {
+		return err
+	}
+	req.ContentLength = info.Size()
+	req.Header.Set("Content-Type", contentType)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("upload failed (%d): %s", resp.StatusCode, string(body))
+	}
+	return nil
 }
