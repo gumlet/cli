@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-// Thin wrapper that runs the downloaded gumlet binary.
-
 const { spawnSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
