@@ -15,6 +15,9 @@
     "image",
     "cdn"
   ],
+  "bin": {
+    "gumlet": "./run.js"
+  },
   "scripts": {
     "postinstall": "node install.js"
   },
