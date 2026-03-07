@@ -3,6 +3,7 @@ package asset
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 
 	"gumlet/pkg/client"
 
@@ -25,6 +26,8 @@ var uploadCmd = &cobra.Command{
 		if cmd.Flags().Changed("title") {
 			v, _ := cmd.Flags().GetString("title")
 			body["title"] = v
+		} else {
+			body["title"] = filepath.Base(filePath)
 		}
 		if cmd.Flags().Changed("description") {
 			v, _ := cmd.Flags().GetString("description")

@@ -123,6 +123,40 @@ func (c *Client) Put(path string, body interface{}) ([]byte, error) {
 	return c.Do(req)
 }
 
+// progressReader wraps an io.Reader and prints upload progress to stdout.
+type progressReader struct {
+	r         io.Reader
+	total     int64
+	read      int64
+	lastPrint int64
+}
+
+func (p *progressReader) Read(buf []byte) (int, error) {
+	n, err := p.r.Read(buf)
+	p.read += int64(n)
+	// Print every ~1 MB or when done
+	if p.total > 0 && (p.read-p.lastPrint >= 1024*1024 || err == io.EOF) {
+		pct := float64(p.read) / float64(p.total) * 100
+		fmt.Fprintf(os.Stderr, "\rUploading... %.1f%% (%s / %s)",
+			pct, formatBytes(p.read), formatBytes(p.total))
+		p.lastPrint = p.read
+	}
+	return n, err
+}
+
+func formatBytes(b int64) string {
+	const unit = 1024
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
+}
+
 // PutFile streams a local file to a pre-signed URL (e.g. S3) using a plain PUT.
 // No Gumlet auth header is added — the URL is self-authorising.
 func (c *Client) PutFile(uploadURL, filePath string) error {
@@ -142,7 +176,8 @@ func (c *Client) PutFile(uploadURL, filePath string) error {
 		contentType = "application/octet-stream"
 	}
 
-	req, err := http.NewRequest("PUT", uploadURL, f)
+	pr := &progressReader{r: f, total: info.Size()}
+	req, err := http.NewRequest("PUT", uploadURL, pr)
 	if err != nil {
 		return err
 	}
@@ -150,6 +185,7 @@ func (c *Client) PutFile(uploadURL, filePath string) error {
 	req.Header.Set("Content-Type", contentType)
 
 	resp, err := c.httpClient.Do(req)
+	fmt.Fprintln(os.Stderr) // newline after progress line
 	if err != nil {
 		return err
 	}
