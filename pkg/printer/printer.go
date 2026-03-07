@@ -87,11 +87,29 @@ func printTable(data []byte, fields []string) error {
 				}
 			}
 		}
-		// Otherwise find the largest array value inside the object
+		// Find the array whose items best match the requested fields.
+		// Score by number of matching fields in the first item; fall back to
+		// largest array when scores are equal (handles no-fields case).
 		var best []interface{}
+		bestScore := -1
 		for _, val := range v {
-			if arr, ok := val.([]interface{}); ok && len(arr) > len(best) {
+			arr, ok := val.([]interface{})
+			if !ok || len(arr) == 0 {
+				continue
+			}
+			score := 0
+			if len(fields) > 0 {
+				if firstObj, ok := arr[0].(map[string]interface{}); ok {
+					for _, f := range fields {
+						if extractField(firstObj, f) != nil {
+							score++
+						}
+					}
+				}
+			}
+			if score > bestScore || (score == bestScore && len(arr) > len(best)) {
 				best = arr
+				bestScore = score
 			}
 		}
 		if best != nil {
