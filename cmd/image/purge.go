@@ -18,7 +18,7 @@ var purgeCmd = &cobra.Command{
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
 		body := map[string]interface{}{
-			"urls": urls,
+			"paths": urls,
 		}
 
 		apiClient, err := client.NewClient()
