@@ -103,6 +103,7 @@ gumlet video workspace delete --workspace-id ws_123
 |---|---|
 | `gumlet video asset list --workspace-id <id>` | List assets in a workspace |
 | `gumlet video asset get --asset-id <id>` | Get details of an asset |
+| `gumlet video asset upload --file <path> --workspace-id <id>` | Upload a local video file |
 | `gumlet video asset delete --asset-id <id>` | Delete an asset |
 
 **`asset list` flags:**
@@ -119,12 +120,27 @@ gumlet video workspace delete --workspace-id ws_123
 | `--sort-by` | Field to sort by |
 | `--order-by` | Sort direction (`asc` / `desc`) |
 
+**`asset upload` flags:**
+
+| Flag | Description |
+|---|---|
+| `--file` | *(required)* Path to the local video file |
+| `--workspace-id` | *(required)* Workspace (collection) ID |
+| `--format` | Transcode format: `ABR` or `MP4` (default: `ABR`) |
+| `--title` | Asset title (defaults to filename if omitted) |
+| `--description` | Asset description |
+| `--profile-id` | Video profile ID |
+| `--playlist-id` | Add asset to this playlist after upload |
+| `--tag` | Comma-separated tags |
+
 **Examples:**
 
 ```sh
 gumlet video asset list --workspace-id ws_123 --output table
 gumlet video asset list --workspace-id ws_123 --status ready --size 20
 gumlet video asset get --asset-id asset_456
+gumlet video asset upload --file ./video.mp4 --workspace-id ws_123
+gumlet video asset upload --file ./video.mp4 --workspace-id ws_123 --title "My Video" --format MP4
 gumlet video asset delete --asset-id asset_456
 ```
 
@@ -134,12 +150,19 @@ gumlet video asset delete --asset-id asset_456
 
 | Command | Description |
 |---|---|
-| `gumlet video playlist list` | List all playlists |
+| `gumlet video playlist list --workspace-id <id>` | List all playlists in a workspace |
 | `gumlet video playlist create --workspace-id <id> --title <title>` | Create a new playlist |
 | `gumlet video playlist update --playlist-id <id>` | Update a playlist |
 | `gumlet video playlist get-assets --playlist-id <id>` | Get assets in a playlist |
 | `gumlet video playlist add-asset --playlist-id <id> --asset-ids <ids>` | Add assets to a playlist |
 | `gumlet video playlist remove-asset --playlist-id <id> --asset-ids <ids>` | Remove assets from a playlist |
+| `gumlet video playlist delete --playlist-id <id>` | Delete a playlist |
+
+**`playlist list` flags:**
+
+| Flag | Description |
+|---|---|
+| `--workspace-id` | *(required)* Workspace ID to list playlists for |
 
 **`playlist create` flags:**
 
@@ -158,22 +181,25 @@ gumlet video asset delete --asset-id asset_456
 | `--description` | New description |
 | `--channel-visibility` | Channel visibility setting |
 
-**`playlist add-asset` / `remove-asset` flags:**
+**`playlist add-asset` flags:**
 
 | Flag | Description |
 |---|---|
 | `--playlist-id` | *(required)* Playlist ID |
 | `--asset-ids` | *(required)* Comma-separated asset IDs |
+| `--positions` | Comma-separated positions for each asset (optional, must match `--asset-ids` count) |
 
 **Examples:**
 
 ```sh
-gumlet video playlist list --output table
+gumlet video playlist list --workspace-id ws_123 --output table
 gumlet video playlist create --workspace-id ws_123 --title "Best of 2026" --description "Top videos"
 gumlet video playlist update --playlist-id pl_789 --title "Renamed Playlist"
 gumlet video playlist add-asset --playlist-id pl_789 --asset-ids asset_1,asset_2
+gumlet video playlist add-asset --playlist-id pl_789 --asset-ids asset_1,asset_2 --positions 1,2
 gumlet video playlist remove-asset --playlist-id pl_789 --asset-ids asset_1
 gumlet video playlist get-assets --playlist-id pl_789 --output table
+gumlet video playlist delete --playlist-id pl_789
 ```
 
 ---
@@ -185,6 +211,7 @@ gumlet video playlist get-assets --playlist-id pl_789 --output table
 | Command | Description |
 |---|---|
 | `gumlet image source list` | List all image sources |
+| `gumlet image source get --source-id <id>` | Get details of an image source |
 | `gumlet image source add --namespace <ns> --type <type>` | Create a new image source |
 | `gumlet image source update --source-id <id>` | Update an image source |
 | `gumlet image source delete --source-id <id>` | Delete an image source |
@@ -202,6 +229,7 @@ gumlet video playlist get-assets --playlist-id pl_789 --output table
 
 ```sh
 gumlet image source list --output table
+gumlet image source get --source-id src_123
 
 # Amazon S3
 gumlet image source add \
@@ -230,7 +258,7 @@ gumlet image purge --subdomain <subdomain> [--urls <url1,url2>]
 | Flag | Description |
 |---|---|
 | `--subdomain` | *(required)* Subdomain to purge cache for |
-| `--urls` | Comma-separated list of specific URLs to purge (omit to purge all) |
+| `--urls` | Comma-separated list of specific paths/URLs to purge (omit to purge all) |
 
 **Examples:**
 
