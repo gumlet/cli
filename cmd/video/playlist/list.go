@@ -21,7 +21,7 @@ var listCmd = &cobra.Command{
 			return
 		}
 
-		collectionID, _ := cmd.Flags().GetString("collection-id")
+		collectionID, _ := cmd.Flags().GetString("workspace-id")
 
 		resp, err := apiClient.Get("/video/playlist", map[string]string{"collection_id": collectionID})
 		if err != nil {
@@ -35,6 +35,6 @@ var listCmd = &cobra.Command{
 
 func init() {
 	Cmd.AddCommand(listCmd)
-	listCmd.Flags().String("collection-id", "", "Collection (workspace) ID to list playlists for")
-	listCmd.MarkFlagRequired("collection-id")
+	listCmd.Flags().String("workspace-id", "", "Workspace ID to list playlists for")
+	listCmd.MarkFlagRequired("workspace-id")
 }
