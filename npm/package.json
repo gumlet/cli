@@ -16,7 +16,7 @@
     "cdn"
   ],
   "bin": {
-    "gumlet": "./gumlet"
+    "gumlet": "gumlet"
   },
   "files": [
     "gumlet",
