@@ -29,7 +29,7 @@ var getAssetsCmd = &cobra.Command{
 			return
 		}
 
-		printer.Print(resp, output, "asset_id", "input.title", "status", "created_at")
+		printer.Print(resp, output, "id", "title", "status", "created_at", "duration")
 	},
 }
 
