@@ -128,10 +128,11 @@ func Box(title string, lines ...string) string {
 		width = 24
 	}
 
+	border := strings.Repeat("─", width+2)
 	var b strings.Builder
-	top := "╭" + strings.Repeat("─", width+2) + "╮"
-	bot := "╰" + strings.Repeat("─", width+2) + "╯"
-	b.WriteString(top + "\n")
+	b.WriteString("╭")
+	b.WriteString(border)
+	b.WriteString("╮\n")
 	for _, line := range content {
 		padding := width - visibleLen(line)
 		if padding < 0 {
@@ -139,7 +140,9 @@ func Box(title string, lines ...string) string {
 		}
 		b.WriteString(fmt.Sprintf("│ %s%s │\n", line, strings.Repeat(" ", padding)))
 	}
-	b.WriteString(bot)
+	b.WriteString("╰")
+	b.WriteString(border)
+	b.WriteString("╯")
 	return b.String()
 }
 
