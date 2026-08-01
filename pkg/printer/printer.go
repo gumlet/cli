@@ -80,7 +80,7 @@ func printTable(data []byte, fields []string) error {
 
 	switch v := raw.(type) {
 	case []interface{}:
-		return renderSlice(v, fields)
+		return renderSlice(v, fields, 0, false, "result", "results")
 	case map[string]interface{}:
 		if len(fields) > 0 {
 			for _, f := range fields {
@@ -89,6 +89,8 @@ func printTable(data []byte, fields []string) error {
 				}
 			}
 		}
+		total, hasTotal := extractTotalCount(v)
+		singular, plural := itemLabels(v)
 		var best []interface{}
 		bestScore := -1
 		for _, val := range v {
@@ -112,7 +114,7 @@ func printTable(data []byte, fields []string) error {
 			}
 		}
 		if best != nil {
-			return renderSlice(best, fields)
+			return renderSlice(best, fields, total, hasTotal, singular, plural)
 		}
 		return renderKeyValue(v, fields)
 	default:
@@ -121,7 +123,7 @@ func printTable(data []byte, fields []string) error {
 	return nil
 }
 
-func renderSlice(rows []interface{}, fields []string) error {
+func renderSlice(rows []interface{}, fields []string, total int, hasTotal bool, singular, plural string) error {
 	if len(rows) == 0 {
 		fmt.Println(ui.EmptyState())
 		return nil
@@ -162,8 +164,40 @@ func renderSlice(rows []interface{}, fields []string) error {
 	}
 
 	fmt.Println()
-	fmt.Println(ui.CountLabel(len(plainRows), "result", "results"))
+	if hasTotal {
+		fmt.Println(ui.PageLabel(len(plainRows), total, singular, plural))
+	} else {
+		fmt.Println(ui.CountLabel(len(plainRows), singular, plural))
+	}
 	return nil
+}
+
+func extractTotalCount(obj map[string]interface{}) (int, bool) {
+	for _, key := range []string{"total_asset_count", "total_count", "total"} {
+		if n, ok := intFromJSON(obj[key]); ok {
+			return n, true
+		}
+	}
+	return 0, false
+}
+
+func itemLabels(obj map[string]interface{}) (string, string) {
+	if _, ok := obj["total_asset_count"]; ok {
+		return "asset", "assets"
+	}
+	return "result", "results"
+}
+
+func intFromJSON(v interface{}) (int, bool) {
+	switch n := v.(type) {
+	case float64:
+		return int(n), true
+	case int:
+		return n, true
+	case int64:
+		return int(n), true
+	}
+	return 0, false
 }
 
 func renderKeyValue(obj map[string]interface{}, fields []string) error {

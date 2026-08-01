@@ -210,6 +210,19 @@ func styleBool(value string) string {
 	}
 }
 
+// PageLabel returns a paginated footer like "10 of 28 assets".
+func PageLabel(shown, total int, singular, plural string) string {
+	word := plural
+	if total == 1 {
+		word = singular
+	}
+	msg := fmt.Sprintf("%d of %d %s", shown, total, word)
+	if colorsOn(os.Stdout) {
+		return Dim(os.Stdout, msg)
+	}
+	return msg
+}
+
 // CountLabel returns a friendly footer for result sets.
 func CountLabel(n int, singular, plural string) string {
 	word := plural
