@@ -161,9 +161,11 @@ func visibleLen(s string) int {
 }
 
 // StyleCell applies semantic coloring for known field values in tables.
+// value should already be padded to the target column width.
 func StyleCell(header, value string) string {
-	if value == "" {
-		return Dim(os.Stdout, "—")
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" || trimmed == "—" {
+		return Dim(os.Stdout, value)
 	}
 
 	switch strings.ToLower(header) {
@@ -174,6 +176,14 @@ func StyleCell(header, value string) string {
 	default:
 		return value
 	}
+}
+
+// PadRight pads plain text to width (no ANSI).
+func PadRight(s string, width int) string {
+	if len(s) >= width {
+		return s
+	}
+	return s + strings.Repeat(" ", width-len(s))
 }
 
 func styleStatus(status string) string {

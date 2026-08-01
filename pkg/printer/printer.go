@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"text/tabwriter"
 
 	"gumlet/pkg/ui"
 )
 
-const maxCellWidth = 40
+const (
+	maxCellWidth = 40
+	colGap       = "  "
+)
 
 // Print outputs data in the specified format ("json" or "table").
 // fields optionally limits which keys are shown; all keys shown if empty.
@@ -134,49 +136,121 @@ func renderSlice(rows []interface{}, fields []string) error {
 	}
 
 	headers := resolveFields(firstObj, fields)
-	displayHeaders := make([]string, len(headers))
+	headerLabels := make([]string, len(headers))
 	for i, h := range headers {
-		label := humanHeader(fieldLabel(h))
-		displayHeaders[i] = ui.Bold(os.Stdout, label)
+		headerLabels[i] = humanHeader(fieldLabel(h))
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-	fmt.Fprintln(w, strings.Join(displayHeaders, "\t"))
-	fmt.Fprintln(w, strings.Join(repeatStr(ui.Dim(os.Stdout, "· · ·"), len(headers)), "\t"))
-
+	plainRows := make([][]string, 0, len(rows))
 	for _, row := range rows {
 		obj, ok := row.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		vals := make([]string, len(headers))
+		cells := make([]string, len(headers))
 		for i, h := range headers {
-			raw := truncate(cellString(extractField(obj, h)), maxCellWidth)
-			vals[i] = ui.StyleCell(fieldLabel(h), raw)
+			cells[i] = plainCell(extractField(obj, h))
 		}
-		fmt.Fprintln(w, strings.Join(vals, "\t"))
+		plainRows = append(plainRows, cells)
 	}
-	if err := w.Flush(); err != nil {
-		return err
+
+	widths := columnWidths(headerLabels, plainRows)
+	printTableRow(styleHeaders(headerLabels, widths))
+	printTableRow(styleSeparators(widths))
+	for _, cells := range plainRows {
+		printTableRow(styleCells(headers, cells, widths))
 	}
 
 	fmt.Println()
-	fmt.Println(ui.CountLabel(len(rows), "result", "results"))
+	fmt.Println(ui.CountLabel(len(plainRows), "result", "results"))
 	return nil
 }
 
 func renderKeyValue(obj map[string]interface{}, fields []string) error {
 	keys := resolveFields(obj, fields)
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-	for _, k := range keys {
-		label := ui.Cyan(os.Stdout, humanHeader(fieldLabel(k)))
-		value := ui.StyleCell(fieldLabel(k), cellString(extractField(obj, k)))
-		fmt.Fprintf(w, "%s\t%s\n", label, value)
+	labels := make([]string, len(keys))
+	values := make([]string, len(keys))
+	for i, k := range keys {
+		labels[i] = humanHeader(fieldLabel(k))
+		values[i] = plainCell(extractField(obj, k))
 	}
-	if err := w.Flush(); err != nil {
-		return err
+
+	labelWidth := maxLen(labels)
+	for i, label := range labels {
+		paddedLabel := ui.PadRight(label, labelWidth)
+		styledLabel := ui.Cyan(os.Stdout, paddedLabel)
+		plainValue := values[i]
+		if plainValue == "" {
+			plainValue = "—"
+		}
+		styledValue := ui.StyleCell(fieldLabel(keys[i]), plainValue)
+		fmt.Println(styledLabel + colGap + styledValue)
 	}
 	return nil
+}
+
+func plainCell(v interface{}) string {
+	raw := cellString(v)
+	if raw == "" {
+		return "—"
+	}
+	return truncate(raw, maxCellWidth)
+}
+
+func columnWidths(headers []string, rows [][]string) []int {
+	widths := make([]int, len(headers))
+	for i, h := range headers {
+		widths[i] = len(h)
+	}
+	for _, row := range rows {
+		for i, cell := range row {
+			if len(cell) > widths[i] {
+				widths[i] = len(cell)
+			}
+		}
+	}
+	return widths
+}
+
+func maxLen(items []string) int {
+	max := 0
+	for _, s := range items {
+		if len(s) > max {
+			max = len(s)
+		}
+	}
+	return max
+}
+
+func printTableRow(cells []string) {
+	fmt.Println(strings.Join(cells, colGap))
+}
+
+// styleHeaders returns bold, width-padded header cells.
+func styleHeaders(labels []string, widths []int) []string {
+	out := make([]string, len(labels))
+	for i, label := range labels {
+		out[i] = ui.Bold(os.Stdout, ui.PadRight(label, widths[i]))
+	}
+	return out
+}
+
+func styleSeparators(widths []int) []string {
+	out := make([]string, len(widths))
+	for i, w := range widths {
+		sep := strings.Repeat("─", w)
+		out[i] = ui.Dim(os.Stdout, sep)
+	}
+	return out
+}
+
+func styleCells(headers []string, cells []string, widths []int) []string {
+	out := make([]string, len(cells))
+	for i, cell := range cells {
+		padded := ui.PadRight(cell, widths[i])
+		out[i] = ui.StyleCell(fieldLabel(headers[i]), padded)
+	}
+	return out
 }
 
 func humanHeader(s string) string {
@@ -257,12 +331,4 @@ func truncate(s string, max int) string {
 		return s
 	}
 	return s[:max-1] + "…"
-}
-
-func repeatStr(s string, n int) []string {
-	out := make([]string, n)
-	for i := range out {
-		out[i] = s
-	}
-	return out
 }
