@@ -43,8 +43,6 @@ var versionCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println()
-		ui.PrintLogo()
-		fmt.Println()
 		ui.PrintVersionBox(buildVersion, buildCommit, buildDate)
 		return nil
 	},
