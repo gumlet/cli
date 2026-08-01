@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"text/tabwriter"
+
+	"gumlet/pkg/ui"
 )
 
 const maxCellWidth = 40
@@ -51,7 +53,6 @@ func filterByFields(v interface{}, fields []string) interface{} {
 				out[fieldLabel(f)] = extracted
 			}
 		}
-		// If none of the fields matched directly, recurse into array values
 		if len(out) == 0 {
 			for k, child := range val {
 				val[k] = filterByFields(child, fields)
@@ -79,7 +80,6 @@ func printTable(data []byte, fields []string) error {
 	case []interface{}:
 		return renderSlice(v, fields)
 	case map[string]interface{}:
-		// If any requested field resolves on this object, render it as key-value
 		if len(fields) > 0 {
 			for _, f := range fields {
 				if extractField(v, f) != nil {
@@ -87,9 +87,6 @@ func printTable(data []byte, fields []string) error {
 				}
 			}
 		}
-		// Find the array whose items best match the requested fields.
-		// Score by number of matching fields in the first item; fall back to
-		// largest array when scores are equal (handles no-fields case).
 		var best []interface{}
 		bestScore := -1
 		for _, val := range v {
@@ -124,7 +121,7 @@ func printTable(data []byte, fields []string) error {
 
 func renderSlice(rows []interface{}, fields []string) error {
 	if len(rows) == 0 {
-		fmt.Println("(no results)")
+		fmt.Println(ui.EmptyState())
 		return nil
 	}
 
@@ -137,14 +134,15 @@ func renderSlice(rows []interface{}, fields []string) error {
 	}
 
 	headers := resolveFields(firstObj, fields)
-
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	displayHeaders := make([]string, len(headers))
 	for i, h := range headers {
-		displayHeaders[i] = fieldLabel(h)
+		label := humanHeader(fieldLabel(h))
+		displayHeaders[i] = ui.Bold(os.Stdout, label)
 	}
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
 	fmt.Fprintln(w, strings.Join(displayHeaders, "\t"))
-	fmt.Fprintln(w, strings.Join(repeatStr("---", len(headers)), "\t"))
+	fmt.Fprintln(w, strings.Join(repeatStr(ui.Dim(os.Stdout, "· · ·"), len(headers)), "\t"))
 
 	for _, row := range rows {
 		obj, ok := row.(map[string]interface{})
@@ -153,22 +151,40 @@ func renderSlice(rows []interface{}, fields []string) error {
 		}
 		vals := make([]string, len(headers))
 		for i, h := range headers {
-			vals[i] = truncate(cellString(extractField(obj, h)), maxCellWidth)
+			raw := truncate(cellString(extractField(obj, h)), maxCellWidth)
+			vals[i] = ui.StyleCell(fieldLabel(h), raw)
 		}
 		fmt.Fprintln(w, strings.Join(vals, "\t"))
 	}
-	return w.Flush()
+	if err := w.Flush(); err != nil {
+		return err
+	}
+
+	fmt.Println()
+	fmt.Println(ui.CountLabel(len(rows), "result", "results"))
+	return nil
 }
 
 func renderKeyValue(obj map[string]interface{}, fields []string) error {
 	keys := resolveFields(obj, fields)
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "KEY\tVALUE")
-	fmt.Fprintln(w, "---\t-----")
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
 	for _, k := range keys {
-		fmt.Fprintf(w, "%s\t%s\n", fieldLabel(k), cellString(extractField(obj, k)))
+		label := ui.Cyan(os.Stdout, humanHeader(fieldLabel(k)))
+		value := ui.StyleCell(fieldLabel(k), cellString(extractField(obj, k)))
+		fmt.Fprintf(w, "%s\t%s\n", label, value)
 	}
-	return w.Flush()
+	if err := w.Flush(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func humanHeader(s string) string {
+	s = strings.ReplaceAll(s, "_", " ")
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }
 
 // resolveFields returns the display fields: the provided list if non-empty,

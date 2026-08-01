@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"gumlet/pkg/ui"
+
 	"github.com/spf13/viper"
 )
 
@@ -23,7 +25,7 @@ type Client struct {
 func NewClient() (*Client, error) {
 	apiKey := viper.GetString("api-key")
 	if apiKey == "" {
-		return nil, fmt.Errorf("API key is not set. Please run 'gumlet login' to configure your API key")
+		return nil, fmt.Errorf("API key is not set — run 'gumlet login' to get started")
 	}
 	return &Client{
 		apiKey:     apiKey,
@@ -123,7 +125,6 @@ func (c *Client) Put(path string, body interface{}) ([]byte, error) {
 	return c.Do(req)
 }
 
-// progressReader wraps an io.Reader and prints upload progress to stdout.
 type progressReader struct {
 	r         io.Reader
 	total     int64
@@ -134,27 +135,11 @@ type progressReader struct {
 func (p *progressReader) Read(buf []byte) (int, error) {
 	n, err := p.r.Read(buf)
 	p.read += int64(n)
-	// Print every ~1 MB or when done
-	if p.total > 0 && (p.read-p.lastPrint >= 1024*1024 || err == io.EOF) {
-		pct := float64(p.read) / float64(p.total) * 100
-		fmt.Fprintf(os.Stderr, "\rUploading... %.1f%% (%s / %s)",
-			pct, formatBytes(p.read), formatBytes(p.total))
+	if p.total > 0 && (p.read-p.lastPrint >= 256*1024 || err == io.EOF) {
+		ui.ProgressBar("Uploading", p.read, p.total)
 		p.lastPrint = p.read
 	}
 	return n, err
-}
-
-func formatBytes(b int64) string {
-	const unit = 1024
-	if b < unit {
-		return fmt.Sprintf("%d B", b)
-	}
-	div, exp := int64(unit), 0
-	for n := b / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
 }
 
 // PutFile streams a local file to a pre-signed URL (e.g. S3) using a plain PUT.
@@ -185,7 +170,7 @@ func (c *Client) PutFile(uploadURL, filePath string) error {
 	req.Header.Set("Content-Type", contentType)
 
 	resp, err := c.httpClient.Do(req)
-	fmt.Fprintln(os.Stderr) // newline after progress line
+	ui.FinishProgress()
 	if err != nil {
 		return err
 	}

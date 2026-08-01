@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"gumlet/pkg/ui"
 )
 
 var (
@@ -41,7 +42,10 @@ var versionCmd = &cobra.Command{
 	Short: "Print version information",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Printf("gumlet version %s\ncommit: %s\nbuilt: %s\n", buildVersion, buildCommit, buildDate)
+		fmt.Println()
+		ui.PrintLogo()
+		fmt.Println()
+		ui.PrintVersionBox(buildVersion, buildCommit, buildDate)
 		return nil
 	},
 }

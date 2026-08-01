@@ -20,28 +20,29 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"gumlet/pkg/ui"
 )
+
+var noColor bool
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
 	Use:   "gumlet",
-	Short: "Gumlet CLI - control all things Gumlet from command line",
-	Long: `Gumlet CLI - control all things Gumlet from command line
-	
-Examples:
-  gumlet video asset list
-  gumlet video asset delete --asset-id <asset-id>
-`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+	Short: "Gumlet CLI — manage video and image assets from your terminal",
+	Long: `Gumlet CLI puts Gumlet's video and image APIs at your fingertips.
+
+Get started:
+  gumlet login                          Authenticate with your API key
+  gumlet video workspace list -o table  Browse your workspaces
+  gumlet video asset upload --help      Upload a video
+
+Use --output table for human-friendly tables, or --output json for scripts.`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the RootCmd.
 func Execute() {
-	err := RootCmd.Execute()
-	if err != nil {
+	if err := RootCmd.Execute(); err != nil {
+		ui.Error("%s", err.Error())
 		os.Exit(1)
 	}
 }
@@ -49,10 +50,14 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 	RootCmd.SilenceUsage = true
+	RootCmd.SilenceErrors = true
 	RootCmd.PersistentFlags().String("output", "json", "Output format: json or table")
+	RootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable colored output")
 }
 
 func initConfig() {
+	ui.Init(noColor)
+
 	home, err := os.UserHomeDir()
 	cobra.CheckErr(err)
 
@@ -64,6 +69,6 @@ func initConfig() {
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err == nil {
-		// fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+		// Config loaded silently.
 	}
 }

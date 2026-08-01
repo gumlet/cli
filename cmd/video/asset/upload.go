@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"gumlet/pkg/client"
+	"gumlet/pkg/ui"
 
 	"github.com/spf13/cobra"
 )
@@ -51,7 +52,7 @@ var uploadCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Println("Creating upload session...")
+		ui.Info("Creating upload session...")
 		resp, err := apiClient.Post("/video/assets/upload", body)
 		if err != nil {
 			return err
@@ -68,15 +69,14 @@ var uploadCmd = &cobra.Command{
 		}
 
 		assetID, _ := result["asset_id"].(string)
-		fmt.Printf("Asset created: %s\n", assetID)
-		fmt.Println("Uploading file...")
+		ui.Success("Asset created: %s", assetID)
 
 		if err := apiClient.PutFile(uploadURL, filePath); err != nil {
 			return fmt.Errorf("upload failed: %w", err)
 		}
 
-		fmt.Printf("Upload complete. Asset ID: %s\n", assetID)
-		fmt.Println("Run `gumlet video asset get --asset-id " + assetID + "` to check processing status.")
+		ui.Success("Upload complete! Asset ID: %s", assetID)
+		ui.Hint("Check status: gumlet video asset get --asset-id %s", assetID)
 		return nil
 	},
 }
