@@ -23,6 +23,13 @@ import (
 	_ "gumlet/cmd/video/workspace"
 )
 
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 func main() {
+	cmd.SetBuildInfo(version, commit, date)
 	cmd.Execute()
 }

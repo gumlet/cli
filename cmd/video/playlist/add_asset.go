@@ -12,19 +12,17 @@ import (
 var addAssetCmd = &cobra.Command{
 	Use:   "add-asset",
 	Short: "Add assets to a playlist",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		playlistID, _ := cmd.Flags().GetString("playlist-id")
 		assetIDs, _ := cmd.Flags().GetStringSlice("asset-ids")
 		positions, _ := cmd.Flags().GetIntSlice("positions")
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
 		if len(assetIDs) == 0 {
-			fmt.Println("Error: --asset-ids is required")
-			return
+			return fmt.Errorf("--asset-ids is required")
 		}
 		if len(positions) > 0 && len(positions) != len(assetIDs) {
-			fmt.Printf("Error: --positions count (%d) must match --asset-ids count (%d)\n", len(positions), len(assetIDs))
-			return
+			return fmt.Errorf("--positions count (%d) must match --asset-ids count (%d)", len(positions), len(assetIDs))
 		}
 
 		assetList := make([]interface{}, len(assetIDs))
@@ -42,18 +40,16 @@ var addAssetCmd = &cobra.Command{
 
 		apiClient, err := client.NewClient()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
 		path := fmt.Sprintf("/video/playlist/%s/asset", playlistID)
 		resp, err := apiClient.Post(path, body)
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
-		printer.Print(resp, output)
+		return printer.Print(resp, output)
 	},
 }
 

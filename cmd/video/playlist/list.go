@@ -1,8 +1,6 @@
 package playlist
 
 import (
-	"fmt"
-
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
@@ -12,24 +10,22 @@ import (
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all playlists",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
 		apiClient, err := client.NewClient()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
 		collectionID, _ := cmd.Flags().GetString("workspace-id")
 
 		resp, err := apiClient.Get("/video/playlist", map[string]string{"collection_id": collectionID})
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
-		printer.Print(resp, output, "id", "collection_id", "title", "description")
+		return printer.Print(resp, output, "id", "collection_id", "title", "description")
 	},
 }
 

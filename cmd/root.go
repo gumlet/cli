@@ -48,6 +48,7 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
+	RootCmd.SilenceUsage = true
 	RootCmd.PersistentFlags().String("output", "json", "Output format: json or table")
 }
 

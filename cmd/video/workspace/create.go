@@ -1,8 +1,6 @@
 package workspace
 
 import (
-	"fmt"
-
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
@@ -12,7 +10,7 @@ import (
 var createCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new video workspace",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		name, _ := cmd.Flags().GetString("name")
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
@@ -22,17 +20,15 @@ var createCmd = &cobra.Command{
 
 		apiClient, err := client.NewClient()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
 		resp, err := apiClient.Post("/video/workspaces", body)
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
-		printer.Print(resp, output, "id", "name", "type", "created_at")
+		return printer.Print(resp, output, "id", "name", "type", "created_at")
 	},
 }
 

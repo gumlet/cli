@@ -12,24 +12,22 @@ import (
 var getCmd = &cobra.Command{
 	Use:   "get",
 	Short: "Get details of a video asset",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		assetID, _ := cmd.Flags().GetString("asset-id")
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
 		apiClient, err := client.NewClient()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
 		path := fmt.Sprintf("/video/assets/%s", assetID)
 		resp, err := apiClient.Get(path, nil)
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
-		printer.Print(resp, output, "asset_id", "input.title", "output.playback_url", "output.thumbnail_url", "status", "created_at", "updated_at", "tag", "collection_id")
+		return printer.Print(resp, output, "asset_id", "input.title", "output.playback_url", "output.thumbnail_url", "status", "created_at", "updated_at", "tag", "collection_id")
 	},
 }
 

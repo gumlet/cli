@@ -13,7 +13,7 @@ import (
 var uploadCmd = &cobra.Command{
 	Use:   "upload",
 	Short: "Upload a local video file as a new asset",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		filePath, _ := cmd.Flags().GetString("file")
 		workspaceID, _ := cmd.Flags().GetString("workspace-id")
 		format, _ := cmd.Flags().GetString("format")
@@ -48,27 +48,23 @@ var uploadCmd = &cobra.Command{
 
 		apiClient, err := client.NewClient()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
 		fmt.Println("Creating upload session...")
 		resp, err := apiClient.Post("/video/assets/upload", body)
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
 		var result map[string]interface{}
 		if err := json.Unmarshal(resp, &result); err != nil {
-			fmt.Println("Error parsing response:", err)
-			return
+			return fmt.Errorf("parsing response: %w", err)
 		}
 
 		uploadURL, ok := result["upload_url"].(string)
 		if !ok || uploadURL == "" {
-			fmt.Println("Error: upload_url not found in response")
-			return
+			return fmt.Errorf("upload_url not found in response")
 		}
 
 		assetID, _ := result["asset_id"].(string)
@@ -76,12 +72,12 @@ var uploadCmd = &cobra.Command{
 		fmt.Println("Uploading file...")
 
 		if err := apiClient.PutFile(uploadURL, filePath); err != nil {
-			fmt.Println("Upload failed:", err)
-			return
+			return fmt.Errorf("upload failed: %w", err)
 		}
 
 		fmt.Printf("Upload complete. Asset ID: %s\n", assetID)
 		fmt.Println("Run `gumlet video asset get --asset-id " + assetID + "` to check processing status.")
+		return nil
 	},
 }
 

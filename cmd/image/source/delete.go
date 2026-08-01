@@ -12,24 +12,22 @@ import (
 var deleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "Delete an image source",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		sourceID, _ := cmd.Flags().GetString("source-id")
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
 		apiClient, err := client.NewClient()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
 		path := fmt.Sprintf("/image/sources/%s", sourceID)
 		resp, err := apiClient.Delete(path)
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
-		printer.Print(resp, output)
+		return printer.Print(resp, output)
 	},
 }
 

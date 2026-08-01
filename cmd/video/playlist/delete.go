@@ -2,6 +2,7 @@ package playlist
 
 import (
 	"fmt"
+	"os"
 
 	"gumlet/pkg/client"
 
@@ -11,23 +12,22 @@ import (
 var deleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "Delete a playlist",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		playlistID, _ := cmd.Flags().GetString("playlist-id")
 
 		apiClient, err := client.NewClient()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
 		path := fmt.Sprintf("/video/playlist/%s", playlistID)
 		resp, err := apiClient.Delete(path)
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
-		fmt.Println(string(resp))
+		_, err = fmt.Fprintln(os.Stdout, string(resp))
+		return err
 	},
 }
 

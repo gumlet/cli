@@ -12,7 +12,7 @@ import (
 var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update a playlist",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		playlistID, _ := cmd.Flags().GetString("playlist-id")
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
@@ -32,18 +32,16 @@ var updateCmd = &cobra.Command{
 
 		apiClient, err := client.NewClient()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
 		path := fmt.Sprintf("/video/playlist/%s", playlistID)
 		resp, err := apiClient.Post(path, body)
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
-		printer.Print(resp, output, "id", "collection_id", "title", "description")
+		return printer.Print(resp, output, "id", "collection_id", "title", "description")
 	},
 }
 

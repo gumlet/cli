@@ -13,7 +13,7 @@ import (
 var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update an image source",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		sourceID, _ := cmd.Flags().GetString("source-id")
 		sourceType, _ := cmd.Flags().GetString("type")
 		configStr, _ := cmd.Flags().GetString("config")
@@ -26,8 +26,7 @@ var updateCmd = &cobra.Command{
 		if configStr != "" {
 			var configObj map[string]interface{}
 			if err := json.Unmarshal([]byte(configStr), &configObj); err != nil {
-				fmt.Println("Invalid --config JSON:", err)
-				return
+				return fmt.Errorf("invalid --config JSON: %w", err)
 			}
 			if sourceType != "" {
 				body[sourceType] = configObj
@@ -36,18 +35,16 @@ var updateCmd = &cobra.Command{
 
 		apiClient, err := client.NewClient()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
 		path := fmt.Sprintf("/image/sources/%s", sourceID)
 		resp, err := apiClient.Post(path, body)
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
-		printer.Print(resp, output, "id", "namespace", "type", "updated_at")
+		return printer.Print(resp, output, "id", "namespace", "type", "updated_at")
 	},
 }
 

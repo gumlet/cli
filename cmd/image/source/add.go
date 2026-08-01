@@ -13,7 +13,7 @@ import (
 var addCmd = &cobra.Command{
 	Use:   "add",
 	Short: "Create a new image source",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		namespace, _ := cmd.Flags().GetString("namespace")
 		sourceType, _ := cmd.Flags().GetString("type")
 		configStr, _ := cmd.Flags().GetString("config")
@@ -27,25 +27,22 @@ var addCmd = &cobra.Command{
 		if configStr != "" {
 			var configObj map[string]interface{}
 			if err := json.Unmarshal([]byte(configStr), &configObj); err != nil {
-				fmt.Println("Invalid --config JSON:", err)
-				return
+				return fmt.Errorf("invalid --config JSON: %w", err)
 			}
 			body[sourceType] = configObj
 		}
 
 		apiClient, err := client.NewClient()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
 		resp, err := apiClient.Post("/image/sources", body)
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
-		printer.Print(resp, output, "id", "namespace", "type", "created_at")
+		return printer.Print(resp, output, "id", "namespace", "type", "created_at")
 	},
 }
 

@@ -12,7 +12,7 @@ import (
 var purgeCmd = &cobra.Command{
 	Use:   "purge",
 	Short: "Purge image cache for a source",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		subdomain, _ := cmd.Flags().GetString("subdomain")
 		urls, _ := cmd.Flags().GetStringSlice("urls")
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
@@ -23,18 +23,16 @@ var purgeCmd = &cobra.Command{
 
 		apiClient, err := client.NewClient()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
 		path := fmt.Sprintf("/purge/%s", subdomain)
 		resp, err := apiClient.Post(path, body)
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
-		printer.Print(resp, output)
+		return printer.Print(resp, output)
 	},
 }
 

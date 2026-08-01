@@ -1,8 +1,6 @@
 package source
 
 import (
-	"fmt"
-
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
@@ -12,22 +10,20 @@ import (
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all image sources",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
 		apiClient, err := client.NewClient()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
 		resp, err := apiClient.Get("/image/sources", nil)
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
-		printer.Print(resp, output, "id", "namespace", "type", "cname", "created_at")
+		return printer.Print(resp, output, "id", "namespace", "type", "cname", "created_at")
 	},
 }
 

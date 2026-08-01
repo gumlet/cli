@@ -12,7 +12,7 @@ import (
 var removeAssetCmd = &cobra.Command{
 	Use:   "remove-asset",
 	Short: "Remove assets from a playlist",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		playlistID, _ := cmd.Flags().GetString("playlist-id")
 		assetIDs, _ := cmd.Flags().GetStringSlice("asset-ids")
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
@@ -23,18 +23,16 @@ var removeAssetCmd = &cobra.Command{
 
 		apiClient, err := client.NewClient()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
 		path := fmt.Sprintf("/video/playlist/%s/asset", playlistID)
 		resp, err := apiClient.DeleteWithBody(path, body)
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
-		printer.Print(resp, output)
+		return printer.Print(resp, output)
 	},
 }
 

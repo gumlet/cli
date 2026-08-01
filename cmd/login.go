@@ -14,12 +14,11 @@ var loginCmd = &cobra.Command{
 	Use:   "login",
 	Short: "Login to Gumlet CLI",
 	Args:  cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Print("Enter API Key: ")
+	RunE: func(cmd *cobra.Command, args []string) error {
+		fmt.Fprint(os.Stdout, "Enter API Key: ")
 		bytePassword, err := term.ReadPassword(int(syscall.Stdin))
 		if err != nil {
-			fmt.Println("\nError reading API key:", err)
-			return
+			return fmt.Errorf("reading API key: %w", err)
 		}
 		apiKey := string(bytePassword)
 		fmt.Println()
@@ -28,17 +27,16 @@ var loginCmd = &cobra.Command{
 
 		home, err := os.UserHomeDir()
 		if err != nil {
-			fmt.Println("Error finding home directory:", err)
-			return
+			return fmt.Errorf("finding home directory: %w", err)
 		}
 
 		configFile := home + "/.gumlet.yaml"
 		if err := viper.WriteConfigAs(configFile); err != nil {
-			fmt.Println("Error writing config file:", err)
-			return
+			return fmt.Errorf("writing config file: %w", err)
 		}
 
 		fmt.Println("Login successful. API key saved to", configFile)
+		return nil
 	},
 }
 

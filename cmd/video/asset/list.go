@@ -13,14 +13,13 @@ import (
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List assets in a video workspace",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workspaceID, _ := cmd.Flags().GetString("workspace-id")
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
 		apiClient, err := client.NewClient()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
 		path := fmt.Sprintf("/video/assets/list/%s", workspaceID)
@@ -34,11 +33,10 @@ var listCmd = &cobra.Command{
 
 		resp, err := apiClient.Get(path, queryParams)
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
-		printer.Print(resp, output, "asset_id", "input.title", "status", "created_at", "tag")
+		return printer.Print(resp, output, "asset_id", "input.title", "status", "created_at", "tag")
 	},
 }
 

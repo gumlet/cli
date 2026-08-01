@@ -12,7 +12,7 @@ import (
 var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update a video workspace",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workspaceID, _ := cmd.Flags().GetString("workspace-id")
 		name, _ := cmd.Flags().GetString("name")
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
@@ -23,18 +23,16 @@ var updateCmd = &cobra.Command{
 
 		apiClient, err := client.NewClient()
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
 		path := fmt.Sprintf("/video/workspaces/%s", workspaceID)
 		resp, err := apiClient.Post(path, body)
 		if err != nil {
-			fmt.Println(err)
-			return
+			return err
 		}
 
-		printer.Print(resp, output, "id", "name", "type", "updated_at")
+		return printer.Print(resp, output, "id", "name", "type", "updated_at")
 	},
 }
 
