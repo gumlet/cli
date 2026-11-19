@@ -1,38 +1,36 @@
 package playlist
 
 import (
-	"fmt"
-	"os"
-
 	"gumlet/pkg/client"
+	"gumlet/pkg/printer"
 
+	"github.com/gumlet/golang-sdk/option"
 	"github.com/spf13/cobra"
 )
 
-var deleteCmd = &cobra.Command{
-	Use:   "delete",
-	Short: "Delete a playlist",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		playlistID, _ := cmd.Flags().GetString("playlist-id")
+func newDeleteCommand(newClient client.Factory) *cobra.Command {
+	deleteCmd := &cobra.Command{
+		Use:   "delete",
+		Short: "Delete a playlist",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			playlistID, _ := cmd.Flags().GetString("playlist-id")
 
-		apiClient, err := client.NewClient()
-		if err != nil {
-			return err
-		}
+			apiClient, err := newClient()
+			if err != nil {
+				return err
+			}
 
-		path := fmt.Sprintf("/video/playlist/%s", playlistID)
-		resp, err := apiClient.Delete(path)
-		if err != nil {
-			return err
-		}
+			var resp []byte
+			err = apiClient.VideoPlaylists.Delete(cmd.Context(), playlistID, option.WithResponseBodyInto(&resp))
+			if err != nil {
+				return err
+			}
 
-		_, err = fmt.Fprintln(os.Stdout, string(resp))
-		return err
-	},
-}
-
-func init() {
-	Cmd.AddCommand(deleteCmd)
+			return printer.Print(cmd, resp, printer.Table{Result: "Playlist deleted."})
+		},
+	}
 	deleteCmd.Flags().String("playlist-id", "", "ID of the playlist to delete")
 	deleteCmd.MarkFlagRequired("playlist-id")
+	return deleteCmd
 }

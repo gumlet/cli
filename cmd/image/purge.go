@@ -2,43 +2,56 @@ package image
 
 import (
 	"fmt"
+	"net/url"
+	"strings"
 
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
+	sdk "github.com/gumlet/golang-sdk"
+	"github.com/gumlet/golang-sdk/option"
 	"github.com/spf13/cobra"
 )
 
-var purgeCmd = &cobra.Command{
-	Use:   "purge",
-	Short: "Purge image cache for a source",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		subdomain, _ := cmd.Flags().GetString("subdomain")
-		urls, _ := cmd.Flags().GetStringSlice("urls")
-		output, _ := cmd.Root().PersistentFlags().GetString("output")
+func newPurgeCommand(newClient client.Factory) *cobra.Command {
+	purgeCmd := &cobra.Command{
+		Use:   "purge",
+		Short: "Purge image cache for a source",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			sourceID, _ := cmd.Flags().GetString("source-id")
+			urls, _ := cmd.Flags().GetStringSlice("urls")
+			if strings.TrimSpace(sourceID) == "" {
+				return fmt.Errorf("--source-id must not be empty")
+			}
+			if len(urls) == 0 {
+				return fmt.Errorf("--urls must contain at least one image path")
+			}
+			for i, path := range urls {
+				u, err := url.Parse(path)
+				if err != nil || strings.TrimSpace(path) == "" || strings.HasPrefix(path, "//") ||
+					strings.ContainsAny(path, "?#") || u.IsAbs() {
+					return fmt.Errorf("--urls entry %d must be an image path without a query or fragment", i+1)
+				}
+			}
 
-		body := map[string]interface{}{
-			"paths": urls,
-		}
+			apiClient, err := newClient()
+			if err != nil {
+				return err
+			}
 
-		apiClient, err := client.NewClient()
-		if err != nil {
-			return err
-		}
+			var resp []byte
+			_, err = apiClient.ImageSources.Purge(cmd.Context(), sourceID, sdk.ImageSourcePurgeParams{Paths: sdk.F(urls)}, option.WithResponseBodyInto(&resp))
+			if err != nil {
+				return err
+			}
 
-		path := fmt.Sprintf("/purge/%s", subdomain)
-		resp, err := apiClient.Post(path, body)
-		if err != nil {
-			return err
-		}
-
-		return printer.Print(resp, output)
-	},
-}
-
-func init() {
-	Cmd.AddCommand(purgeCmd)
-	purgeCmd.Flags().String("subdomain", "", "Subdomain to purge cache for")
-	purgeCmd.MarkFlagRequired("subdomain")
-	purgeCmd.Flags().StringSlice("urls", []string{}, "URLs to purge")
+			return printer.Print(cmd, resp, printer.Table{Result: "Image cache purge requested."})
+		},
+	}
+	purgeCmd.Flags().String("source-id", "", "ID of the image source")
+	purgeCmd.MarkFlagRequired("source-id")
+	purgeCmd.Flags().StringSlice("urls", nil, "Comma-separated image paths without query strings")
+	purgeCmd.MarkFlagRequired("urls")
+	return purgeCmd
 }

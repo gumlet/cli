@@ -1,184 +1,54 @@
 package client
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"io"
-	"mime"
-	"net/http"
-	"os"
-	"path/filepath"
+	"time"
 
-	"gumlet/pkg/ui"
-
-	"github.com/spf13/viper"
+	sdk "github.com/gumlet/golang-sdk"
+	"github.com/gumlet/golang-sdk/option"
 )
 
-const baseURL = "https://api.gumlet.com/v1"
-
 type Client struct {
-	apiKey     string
-	httpClient *http.Client
+	ImageSources    *sdk.ImageSourceService
+	VideoAssets     *sdk.VideoAssetService
+	VideoPlaylists  *sdk.VideoPlaylistService
+	VideoWorkspaces *sdk.VideoWorkspaceService
+	Folders         *sdk.FolderService
+	RecycleBin      *sdk.RecycleBinService
+	UserData        *sdk.UserDataService
+	Billing         *sdk.BillingService
+	ChannelViewers  *sdk.ChannelViewerService
+	LiveWorkspaces  *sdk.LiveStreamWorkspaceService
+	LiveAssets      *sdk.LiveStreamAssetService
 }
 
-func NewClient() (*Client, error) {
-	apiKey := viper.GetString("api-key")
-	if apiKey == "" {
-		return nil, fmt.Errorf("API key is not set — run 'gumlet login' to get started")
+type Factory func() (*Client, error)
+
+func New(apiKey, version string, extra ...option.RequestOption) *Client {
+	if version == "" {
+		version = "dev"
 	}
+	opts := []option.RequestOption{
+		option.WithEnvironmentProduction(),
+		option.WithAPIKey(apiKey),
+		option.WithHeader("User-Agent", "gumlet-cli/"+version),
+		option.WithRequestTimeout(30 * time.Second),
+		// Keep the previous one-attempt behavior, especially for asset creation.
+		option.WithMaxRetries(0),
+	}
+	opts = append(opts, extra...)
+	// Construct the SDK services explicitly so inherited SDK environment
+	// variables can't redirect a saved CLI credential or inject headers.
 	return &Client{
-		apiKey:     apiKey,
-		httpClient: &http.Client{},
-	}, nil
-}
-
-func (c *Client) newRequest(method, path string, body interface{}) (*http.Request, error) {
-	url := baseURL + path
-	var buf *bytes.Buffer
-	if body != nil {
-		b, err := json.Marshal(body)
-		if err != nil {
-			return nil, err
-		}
-		buf = bytes.NewBuffer(b)
-	} else {
-		buf = bytes.NewBuffer(nil)
+		ImageSources:    sdk.NewImageSourceService(opts...),
+		VideoAssets:     sdk.NewVideoAssetService(opts...),
+		VideoPlaylists:  sdk.NewVideoPlaylistService(opts...),
+		VideoWorkspaces: sdk.NewVideoWorkspaceService(opts...),
+		Folders:         sdk.NewFolderService(opts...),
+		RecycleBin:      sdk.NewRecycleBinService(opts...),
+		UserData:        sdk.NewUserDataService(opts...),
+		Billing:         sdk.NewBillingService(opts...),
+		ChannelViewers:  sdk.NewChannelViewerService(opts...),
+		LiveWorkspaces:  sdk.NewLiveStreamWorkspaceService(opts...),
+		LiveAssets:      sdk.NewLiveStreamAssetService(opts...),
 	}
-
-	req, err := http.NewRequest(method, url, buf)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
-
-	return req, nil
-}
-
-func (c *Client) Do(req *http.Request) ([]byte, error) {
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("API error: %s", string(body))
-	}
-
-	return body, nil
-}
-
-func (c *Client) Get(path string, queryParams map[string]string) ([]byte, error) {
-	req, err := c.newRequest("GET", path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	q := req.URL.Query()
-	for k, v := range queryParams {
-		if v != "" {
-			q.Add(k, v)
-		}
-	}
-	req.URL.RawQuery = q.Encode()
-
-	return c.Do(req)
-}
-
-func (c *Client) Post(path string, body interface{}) ([]byte, error) {
-	req, err := c.newRequest("POST", path, body)
-	if err != nil {
-		return nil, err
-	}
-	return c.Do(req)
-}
-
-func (c *Client) Delete(path string) ([]byte, error) {
-	req, err := c.newRequest("DELETE", path, nil)
-	if err != nil {
-		return nil, err
-	}
-	return c.Do(req)
-}
-
-func (c *Client) DeleteWithBody(path string, body interface{}) ([]byte, error) {
-	req, err := c.newRequest("DELETE", path, body)
-	if err != nil {
-		return nil, err
-	}
-	return c.Do(req)
-}
-
-func (c *Client) Put(path string, body interface{}) ([]byte, error) {
-	req, err := c.newRequest("PUT", path, body)
-	if err != nil {
-		return nil, err
-	}
-	return c.Do(req)
-}
-
-type progressReader struct {
-	r         io.Reader
-	total     int64
-	read      int64
-	lastPrint int64
-}
-
-func (p *progressReader) Read(buf []byte) (int, error) {
-	n, err := p.r.Read(buf)
-	p.read += int64(n)
-	if p.total > 0 && (p.read-p.lastPrint >= 256*1024 || err == io.EOF) {
-		ui.ProgressBar("Uploading", p.read, p.total)
-		p.lastPrint = p.read
-	}
-	return n, err
-}
-
-// PutFile streams a local file to a pre-signed URL (e.g. S3) using a plain PUT.
-// No Gumlet auth header is added — the URL is self-authorising.
-func (c *Client) PutFile(uploadURL, filePath string) error {
-	f, err := os.Open(filePath)
-	if err != nil {
-		return fmt.Errorf("cannot open file: %w", err)
-	}
-	defer f.Close()
-
-	info, err := f.Stat()
-	if err != nil {
-		return fmt.Errorf("cannot stat file: %w", err)
-	}
-
-	contentType := mime.TypeByExtension(filepath.Ext(filePath))
-	if contentType == "" {
-		contentType = "application/octet-stream"
-	}
-
-	pr := &progressReader{r: f, total: info.Size()}
-	req, err := http.NewRequest("PUT", uploadURL, pr)
-	if err != nil {
-		return err
-	}
-	req.ContentLength = info.Size()
-	req.Header.Set("Content-Type", contentType)
-
-	resp, err := c.httpClient.Do(req)
-	ui.FinishProgress()
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("upload failed (%d): %s", resp.StatusCode, string(body))
-	}
-	return nil
 }

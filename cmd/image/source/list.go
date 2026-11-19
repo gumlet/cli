@@ -4,29 +4,40 @@ import (
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
+	sdk "github.com/gumlet/golang-sdk"
+	"github.com/gumlet/golang-sdk/option"
 	"github.com/spf13/cobra"
 )
 
-var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all image sources",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		output, _ := cmd.Root().PersistentFlags().GetString("output")
+func newListCommand(newClient client.Factory) *cobra.Command {
+	listCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List all image sources",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
 
-		apiClient, err := client.NewClient()
-		if err != nil {
-			return err
-		}
+			apiClient, err := newClient()
+			if err != nil {
+				return err
+			}
 
-		resp, err := apiClient.Get("/image/sources", nil)
-		if err != nil {
-			return err
-		}
+			var resp []byte
+			_, err = apiClient.ImageSources.List(cmd.Context(), sdk.ImageSourceListParams{}, option.WithResponseBodyInto(&resp))
+			if err != nil {
+				return err
+			}
 
-		return printer.Print(resp, output, "id", "namespace", "type", "cname", "created_at")
-	},
-}
-
-func init() {
-	Cmd.AddCommand(listCmd)
+			return printer.Print(cmd, resp, printer.Table{
+				RowsKey: "all_sources",
+				Columns: []string{"id", "namespace", "type", "cname"},
+				Fields: map[string]printer.Field{
+					"cname":       {Label: "Custom domains", Format: printer.JoinStrings(", ")},
+					"total_count": {Label: "Total sources"},
+				},
+				Summary: []string{"total_count"},
+				More:    "next_page_token",
+			})
+		},
+	}
+	return listCmd
 }

@@ -1,38 +1,36 @@
 package workspace
 
 import (
-	"fmt"
-
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
+	"github.com/gumlet/golang-sdk/option"
 	"github.com/spf13/cobra"
 )
 
-var deleteCmd = &cobra.Command{
-	Use:   "delete",
-	Short: "Delete a video workspace",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		workspaceID, _ := cmd.Flags().GetString("workspace-id")
-		output, _ := cmd.Root().PersistentFlags().GetString("output")
+func newDeleteCommand(newClient client.Factory) *cobra.Command {
+	deleteCmd := &cobra.Command{
+		Use:   "delete",
+		Short: "Delete a video workspace",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			workspaceID, _ := cmd.Flags().GetString("workspace-id")
 
-		apiClient, err := client.NewClient()
-		if err != nil {
-			return err
-		}
+			apiClient, err := newClient()
+			if err != nil {
+				return err
+			}
 
-		path := fmt.Sprintf("/video/workspaces/%s", workspaceID)
-		resp, err := apiClient.Delete(path)
-		if err != nil {
-			return err
-		}
+			var resp []byte
+			_, err = apiClient.VideoWorkspaces.Delete(cmd.Context(), workspaceID, option.WithResponseBodyInto(&resp))
+			if err != nil {
+				return err
+			}
 
-		return printer.Print(resp, output)
-	},
-}
-
-func init() {
-	Cmd.AddCommand(deleteCmd)
+			return printer.Print(cmd, resp, printer.Table{Result: "Workspace deleted."})
+		},
+	}
 	deleteCmd.Flags().String("workspace-id", "", "ID of the workspace to delete")
 	deleteCmd.MarkFlagRequired("workspace-id")
+	return deleteCmd
 }

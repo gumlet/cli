@@ -1,16 +1,17 @@
 package playlist
 
 import (
-	"gumlet/cmd/video"
+	"gumlet/pkg/client"
 
 	"github.com/spf13/cobra"
 )
 
-var Cmd = &cobra.Command{
-	Use:   "playlist",
-	Short: "Manage video playlists",
-}
-
-func init() {
-	video.Cmd.AddCommand(Cmd)
+func NewCommand(newClient client.Factory) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "playlist",
+		Short: "Manage video playlists",
+	}
+	cmd.AddCommand(newAddAssetCommand(newClient), newCreateCommand(newClient), newDeleteCommand(newClient), newGetAssetsCommand(newClient), newListCommand(newClient), newRemoveAssetCommand(newClient), newUpdateCommand(newClient))
+	cmd.AddCommand(newReorderCommand(newClient))
+	return cmd
 }

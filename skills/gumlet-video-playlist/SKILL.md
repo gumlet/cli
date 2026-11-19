@@ -1,6 +1,6 @@
 ---
 name: gumlet-video-playlist
-description: Manage Gumlet video playlists using the Gumlet CLI. Use this skill to list playlists in a workspace, create or update a playlist, add or remove assets from a playlist, view assets inside a playlist, or delete a playlist. Requires the Gumlet CLI to be installed and authenticated via `gumlet login`.
+description: Manage Gumlet video playlists using the Gumlet CLI. Use this skill to list, create, update, or delete playlists, and to view, add, remove, or reorder playlist assets. Requires the Gumlet CLI to be installed and authenticated via `gumlet login`.
 ---
 
 ## List playlists in a workspace
@@ -19,12 +19,13 @@ gumlet video playlist create --workspace-id <id> --title "Best of 2026" --descri
 
 ## Update a playlist
 
-All flags are optional — only supplied flags are updated.
+Supply `--playlist-id` and at least one field to update. Only supplied fields change.
 
 ```sh
 gumlet video playlist update --playlist-id <id> --title "Renamed Playlist"
 gumlet video playlist update --playlist-id <id> --description "Updated description"
-gumlet video playlist update --playlist-id <id> --channel-visibility public
+gumlet video playlist update --playlist-id <id> --channel-visibility=true
+gumlet video playlist update --playlist-id <id> --channel-visibility=false
 ```
 
 ## Get assets in a playlist
@@ -48,6 +49,18 @@ gumlet video playlist add-asset --playlist-id <id> --asset-ids asset_1,asset_2 -
 ```
 
 > When `--positions` is provided, the count must match the number of `--asset-ids`.
+
+## Reorder a playlist
+
+```sh
+gumlet video playlist reorder --playlist-id PLAYLIST_ID --asset-id ASSET_ID \
+  --page-number 1 --page-size 20 --asset-position 0
+gumlet video playlist reorder --playlist-id PLAYLIST_ID --sort-by created_at --sort-order desc
+```
+
+Choose one mode: move an asset to a zero-based position within a page, or
+sort the entire playlist by `title` or `created_at` in `asc` or `desc` order.
+Page numbers start at 1, and page sizes can be 1–200.
 
 ## Remove assets from a playlist
 

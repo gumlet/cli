@@ -1,16 +1,18 @@
 package asset
 
 import (
-	"gumlet/cmd/video"
+	"gumlet/pkg/client"
 
 	"github.com/spf13/cobra"
 )
 
-var Cmd = &cobra.Command{
-	Use:   "asset",
-	Short: "Manage video assets",
-}
-
-func init() {
-	video.Cmd.AddCommand(Cmd)
+func NewCommand(newClient client.Factory) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "asset",
+		Short: "Manage video assets",
+	}
+	cmd.AddCommand(newDeleteCommand(newClient), newGetCommand(newClient), newListCommand(newClient), newUploadCommand(newClient))
+	cmd.AddCommand(newUpdateCommand(newClient), newListRecoverableCommand(newClient), newRecoverCommand(newClient),
+		newBulkDeleteCommand(newClient), newBulkTagCommand(newClient))
+	return cmd
 }

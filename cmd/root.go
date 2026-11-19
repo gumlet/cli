@@ -16,59 +16,60 @@ limitations under the License.
 package cmd
 
 import (
-	"os"
+	"fmt"
+
+	"gumlet/cmd/image"
+	"gumlet/cmd/video"
+	"gumlet/pkg/client"
+	"gumlet/pkg/credentials"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"gumlet/pkg/ui"
 )
 
-var noColor bool
+type Options struct {
+	Version, Commit, Date string
+	Credentials           credentials.Store
+	NewClient             client.Factory
+}
 
-// RootCmd represents the base command when called without any subcommands
-var RootCmd = &cobra.Command{
-	Use:   "gumlet",
-	Short: "Gumlet CLI — manage video and image assets from your terminal",
-	Long: `Gumlet CLI puts Gumlet's video and image APIs at your fingertips.
+func NewRootCommand(opts Options) *cobra.Command {
+	newClient := opts.NewClient
+	if newClient == nil {
+		newClient = func() (*client.Client, error) {
+			key, err := opts.Credentials.APIKey()
+			if err != nil {
+				return nil, err
+			}
+			return client.New(key, opts.Version), nil
+		}
+	}
+	var output string
+	root := &cobra.Command{
+		Use:   "gumlet",
+		Short: "Gumlet CLI — manage video and image assets from your terminal",
+		Long: `Gumlet CLI puts Gumlet's video and image APIs at your fingertips.
 
 Get started:
-  gumlet login                          Authenticate with your API key
+  gumlet login                          Save your API key
   gumlet video workspace list -o table  Browse your workspaces
   gumlet video asset upload --help      Upload a video
 
 Use --output table for human-friendly tables, or --output json for scripts.`,
-}
-
-// Execute adds all child commands to the root command and sets flags appropriately.
-func Execute() {
-	if err := RootCmd.Execute(); err != nil {
-		ui.Error("%s", err.Error())
-		os.Exit(1)
+		Version:       opts.Version,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
+			if output != "json" && output != "table" {
+				return fmt.Errorf("invalid --output %q: use json or table", output)
+			}
+			return nil
+		},
 	}
-}
-
-func init() {
-	cobra.OnInitialize(initConfig)
-	RootCmd.SilenceUsage = true
-	RootCmd.SilenceErrors = true
-	RootCmd.PersistentFlags().String("output", "json", "Output format: json or table")
-	RootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable colored output")
-}
-
-func initConfig() {
-	ui.Init(noColor)
-
-	home, err := os.UserHomeDir()
-	cobra.CheckErr(err)
-
-	viper.AddConfigPath(home)
-	viper.SetConfigName(".gumlet")
-	viper.SetConfigType("yaml")
-
-	viper.SetEnvPrefix("GUMLET")
-	viper.AutomaticEnv()
-
-	if err := viper.ReadInConfig(); err == nil {
-		// Config loaded silently.
-	}
+	root.PersistentFlags().StringVarP(&output, "output", "o", "json", "Output format: json or table")
+	root.PersistentFlags().Bool("no-color", false, "Disable colored output")
+	root.SetVersionTemplate(versionText(opts.Version, opts.Commit, opts.Date))
+	root.AddCommand(newLoginCommand(opts.Credentials), newLogoutCommand(opts.Credentials),
+		newVersionCommand(opts.Version, opts.Commit, opts.Date), image.NewCommand(newClient), video.NewCommand(newClient))
+	root.AddCommand(newUserCommand(newClient), newBillingCommand(newClient))
+	return root
 }
