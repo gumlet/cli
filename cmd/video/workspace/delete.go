@@ -27,7 +27,7 @@ func newDeleteCommand(newClient client.Factory) *cobra.Command {
 				return err
 			}
 
-			return printer.Print(cmd, resp, printer.Table{})
+			return printer.Print(cmd, resp, printer.Table{Result: "Workspace deleted."})
 		},
 	}
 	deleteCmd.Flags().String("workspace-id", "", "ID of the workspace to delete")

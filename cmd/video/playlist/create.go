@@ -34,7 +34,11 @@ func newCreateCommand(newClient client.Factory) *cobra.Command {
 				return err
 			}
 
-			return printer.Print(cmd, resp, printer.Table{Columns: []string{"id", "workspace_id", "title", "description"}})
+			return printer.Print(cmd, resp, printer.Table{
+				Columns: []string{"id", "title", "workspace_id", "description"},
+				Fields:  map[string]printer.Field{"id": {Label: "Playlist ID"}},
+				Result:  "Playlist created.",
+			})
 		},
 	}
 	createCmd.Flags().String("workspace-id", "", "Workspace (collection) ID for the playlist")

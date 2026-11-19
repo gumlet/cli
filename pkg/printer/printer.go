@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"slices"
 	"strings"
 	"text/tabwriter"
 	"unicode"
@@ -16,21 +15,37 @@ import (
 	"golang.org/x/term"
 )
 
-// Table describes the fields to display and, for a list envelope, its row key.
-// A top-level array needs no row key.
+// Table is an explicit view of an API response. RowsKey may be a dot-separated
+// path; a top-level array needs no row key. Summary reads from the root object.
 type Table struct {
 	RowsKey string
 	Columns []string
+	Fields  map[string]Field
+	Summary []string
+	// More is the path to an API-provided next-page flag or cursor.
+	More string
+	// HasMore handles numbered lists where the response only exposes a total.
+	HasMore func(root map[string]any) bool
+	// Result is the confirmation for a successful mutation, including an empty body.
+	Result string
+}
+
+type Field struct {
+	Label  string
+	Format func(value any, row map[string]any) string
+	// MaxWidth limits prose, in runes. Zero uses the default for names and
+	// descriptions; a negative value leaves the full text intact.
+	MaxWidth int
 }
 
 func Print(cmd *cobra.Command, data []byte, table Table) error {
 	data = bytes.TrimSpace(data)
-	if len(data) == 0 {
-		return nil
-	}
 	out := cmd.OutOrStdout()
 	format, _ := cmd.Flags().GetString("output")
 	if format == "json" {
+		if len(data) == 0 {
+			return nil
+		}
 		var formatted bytes.Buffer
 		if err := json.Indent(&formatted, data, "", "  "); err != nil {
 			return errors.New("API returned an invalid JSON response")
@@ -44,123 +59,245 @@ func Print(cmd *cobra.Command, data []byte, table Table) error {
 
 func printTable(out io.Writer, data []byte, table Table, color bool) error {
 	var value any
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.UseNumber()
-	if !json.Valid(data) || decoder.Decode(&value) != nil {
-		return errors.New("API returned an invalid JSON response")
-	}
-	if table.RowsKey != "" {
-		if envelope, ok := value.(map[string]any); ok {
-			rows, exists := envelope[table.RowsKey]
-			if !exists {
-				return fmt.Errorf("API response did not include %q rows; use -o json to inspect it", table.RowsKey)
-			}
-			if rows == nil {
-				value = []any{}
-			} else if array, ok := rows.([]any); ok {
-				value = array
-			} else {
-				return fmt.Errorf("API response field %q is not an array", table.RowsKey)
-			}
+	if len(data) != 0 {
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		decoder.UseNumber()
+		if !json.Valid(data) || decoder.Decode(&value) != nil {
+			return errors.New("API returned an invalid JSON response")
 		}
 	}
-	var formatted bytes.Buffer
-	writer := tabwriter.NewWriter(&formatted, 0, 4, 2, ' ', 0)
+	if len(table.Columns) == 0 && table.Result == "" && len(table.Summary) == 0 {
+		return errors.New("no table view is available; use -o json")
+	}
+	root, _ := value.(map[string]any)
+	failed := table.Result != "" && failure(value, root)
+	if table.RowsKey != "" {
+		var rows any
+		if value != nil {
+			var exists bool
+			rows, exists = lookup(value, table.RowsKey)
+			if !exists && !failed {
+				return fmt.Errorf("API response did not include %q rows; use -o json to inspect it", table.RowsKey)
+			}
+		}
+		switch array := rows.(type) {
+		case nil:
+			value = []any(nil)
+		case []any:
+			value = array
+		default:
+			return fmt.Errorf("API response field %q is not an array", table.RowsKey)
+		}
+	}
+	var output bytes.Buffer
+	if table.Result != "" {
+		if failed {
+			fmt.Fprintln(&output, "API reported failure. Use -o json to inspect the response.")
+		} else {
+			fmt.Fprintln(&output, table.Result)
+		}
+	}
+	if len(table.Columns) > 0 {
+		if err := table.writeBody(&output, value, color); err != nil {
+			return err
+		}
+	}
+	if len(table.Summary) > 0 {
+		writer := tabwriter.NewWriter(&output, 0, 4, 2, ' ', 0)
+		table.writeFields(writer, root, table.Summary, true)
+		if err := writer.Flush(); err != nil {
+			return err
+		}
+	}
+	var next any
+	if table.More != "" {
+		next, _ = lookup(root, table.More)
+	}
+	if more(next) || (table.HasMore != nil && table.HasMore(root)) {
+		fmt.Fprintln(&output, "More results are available. Use -o json for pagination details.")
+	}
+	_, err := output.WriteTo(out)
+	return err
+}
+
+func (t Table) writeBody(out *bytes.Buffer, value any, color bool) error {
+	var body bytes.Buffer
+	writer := tabwriter.NewWriter(&body, 0, 4, 2, ' ', 0)
 	hasHeader := false
 	switch v := value.(type) {
 	case []any:
 		if len(v) == 0 {
-			_, err := fmt.Fprintln(out, "No results found.")
-			return err
+			if t.Result == "" {
+				fmt.Fprintln(writer, "No results found.")
+			}
+			break
 		}
-		columns := table.Columns
-		if len(columns) == 0 {
-			if row, ok := v[0].(map[string]any); ok {
-				columns = keys(row)
-			}
+		hasHeader = true
+		labels := make([]string, len(t.Columns))
+		for i, path := range t.Columns {
+			labels[i] = t.label(path)
 		}
-		if len(columns) > 0 {
-			hasHeader = true
-			labels := make([]string, len(columns))
-			for i, name := range columns {
-				labels[i] = heading(name)
+		fmt.Fprintln(writer, strings.Join(labels, "\t"))
+		values := make([]string, len(t.Columns))
+		for _, item := range v {
+			row, ok := item.(map[string]any)
+			if !ok {
+				return errors.New("API response included an invalid table row; use -o json to inspect it")
 			}
-			_, _ = fmt.Fprintln(writer, strings.Join(labels, "\t"))
-		}
-		for _, row := range v {
-			if len(columns) == 0 {
-				_, _ = fmt.Fprintln(writer, cell(row))
-				continue
+			for i, path := range t.Columns {
+				values[i] = display(t.cell(row, path))
 			}
-			values := make([]string, len(columns))
-			for i, column := range columns {
-				values[i] = cell(field(row, column))
-			}
-			_, _ = fmt.Fprintln(writer, strings.Join(values, "\t"))
+			fmt.Fprintln(writer, strings.Join(values, "\t"))
 		}
 	case map[string]any:
-		columns := table.Columns
-		if len(columns) == 0 {
-			columns = keys(v)
-		}
-		for _, column := range columns {
-			_, _ = fmt.Fprintf(writer, "%s\t%s\n", heading(column), cell(field(v, column)))
+		t.writeFields(writer, v, t.Columns, t.Result != "")
+	case nil:
+		if t.Result == "" {
+			fmt.Fprintln(writer, "No results found.")
 		}
 	default:
-		_, _ = fmt.Fprintln(writer, cell(v))
+		if t.Result == "" {
+			return errors.New("API response has no table fields; use -o json to inspect it")
+		}
 	}
 	if err := writer.Flush(); err != nil {
 		return err
 	}
 	if color && hasHeader {
 		// Style the header after layout so ANSI codes don't affect column widths.
-		header, rows, _ := bytes.Cut(formatted.Bytes(), []byte("\n"))
-		_, err := fmt.Fprintf(out, "\x1b[1m%s\x1b[0m\n%s", header, rows)
-		return err
+		header, rows, _ := bytes.Cut(body.Bytes(), []byte("\n"))
+		fmt.Fprintf(out, "\x1b[1m%s\x1b[0m\n%s", header, rows)
+	} else {
+		out.Write(body.Bytes())
 	}
-	_, err := formatted.WriteTo(out)
-	return err
+	return nil
 }
 
-func keys(value map[string]any) []string {
-	out := make([]string, 0, len(value))
-	for key := range value {
-		out = append(out, key)
+func (t Table) writeFields(w io.Writer, row map[string]any, paths []string, omitMissing bool) {
+	for _, path := range paths {
+		text := t.cell(row, path)
+		if text == "" && omitMissing {
+			continue
+		}
+		fmt.Fprintf(w, "%s\t%s\n", t.label(path), display(text))
 	}
-	slices.Sort(out)
-	return out
 }
 
-func field(value any, path string) any {
+func lookup(value any, path string) (any, bool) {
 	for part := range strings.SplitSeq(path, ".") {
 		object, ok := value.(map[string]any)
 		if !ok {
-			return nil
+			return nil, false
 		}
-		value = object[part]
+		value, ok = object[part]
+		if !ok {
+			return nil, false
+		}
 	}
-	return value
+	return value, true
 }
 
-func heading(path string) string {
-	path = path[strings.LastIndex(path, ".")+1:]
-	return strings.ToUpper(clean(strings.ReplaceAll(path, "_", " ")))
+func (t Table) label(path string) string {
+	label := t.Fields[path].Label
+	if label == "" {
+		label = strings.ReplaceAll(leaf(path), "_", " ")
+	}
+	return strings.ToUpper(clean(label))
 }
 
-func cell(value any) string {
-	if value == nil || value == "" {
+func leaf(path string) string {
+	return path[strings.LastIndex(path, ".")+1:]
+}
+
+func (t Table) cell(row map[string]any, path string) string {
+	value, _ := lookup(row, path)
+	cfg := t.Fields[path]
+	text := scalar(value)
+	if cfg.Format != nil {
+		text = cfg.Format(value, row)
+	}
+	text = clean(text)
+	limit := cfg.MaxWidth
+	if limit == 0 {
+		switch leaf(path) {
+		case "name", "title", "description":
+			limit = 50
+		}
+	}
+	if limit > 0 {
+		runes := []rune(text)
+		if len(runes) > limit {
+			return string(runes[:limit-1]) + "…"
+		}
+	}
+	return text
+}
+
+func display(text string) string {
+	if text == "" {
 		return "—"
 	}
-	text, ok := value.(string)
-	if !ok {
-		encoded, _ := json.Marshal(value)
-		text = string(encoded)
+	return text
+}
+
+func scalar(value any) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case json.Number:
+		return v.String()
+	case bool:
+		if v {
+			return "true"
+		}
+		return "false"
+	default:
+		return ""
 	}
-	runes := []rune(clean(text))
-	if len(runes) > 50 {
-		return string(runes[:49]) + "…"
+}
+
+func more(value any) bool {
+	switch v := value.(type) {
+	case string:
+		return strings.TrimSpace(v) != ""
+	case bool:
+		return v
+	case json.Number:
+		n, err := v.Int64()
+		return err == nil && n > 0
+	default:
+		return false
 	}
-	return string(runes)
+}
+
+func failure(value any, root map[string]any) bool {
+	if value == false {
+		return true
+	}
+	for _, key := range []string{"success", "ok", "deleted", "uploaded", "status"} {
+		if root[key] == false {
+			return true
+		}
+	}
+	switch strings.ToLower(strings.TrimSpace(scalar(root["status"]))) {
+	case "error", "errored", "failed", "failure", "unsuccessful":
+		return true
+	}
+	return hasError(root["error"]) || hasError(root["errors"])
+}
+
+func hasError(value any) bool {
+	switch v := value.(type) {
+	case bool:
+		return v
+	case string:
+		return strings.TrimSpace(v) != ""
+	case map[string]any:
+		return len(v) != 0
+	case []any:
+		return len(v) != 0
+	}
+	return false
 }
 
 func clean(text string) string {

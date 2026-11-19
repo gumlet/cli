@@ -49,7 +49,10 @@ func newUpdateCommand(newClient client.Factory) *cobra.Command {
 				return err
 			}
 
-			return printer.Print(cmd, resp, printer.Table{Columns: []string{"id", "namespace", "type", "updated_at"}})
+			return printer.Print(cmd, resp, printer.Table{
+				Result:  "Image source updated.",
+				Columns: []string{"id", "namespace", "type"},
+			})
 		},
 	}
 	updateCmd.Flags().String("source-id", "", "ID of the image source to update")

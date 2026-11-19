@@ -26,7 +26,7 @@ func newBulkDeleteCommand(newClient client.Factory) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return printer.Print(cmd, raw, printer.Table{})
+			return printer.Print(cmd, raw, printer.Table{Result: "Assets deleted."})
 		})
 }
 
@@ -55,7 +55,7 @@ func newBulkTagCommand(newClient client.Factory) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return printer.Print(cmd, raw, printer.Table{})
+			return printer.Print(cmd, raw, printer.Table{Result: "Asset tags updated."})
 		})
 	cmd.Flags().StringSliceVar(&add, "add-tags", nil, "Tags to add")
 	cmd.Flags().StringSliceVar(&remove, "remove-tags", nil, "Tags to remove")

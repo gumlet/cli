@@ -2,6 +2,7 @@ package asset
 
 import (
 	"fmt"
+	"time"
 
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
@@ -78,7 +79,16 @@ func newListCommand(newClient client.Factory) *cobra.Command {
 				return err
 			}
 
-			return printer.Print(cmd, resp, printer.Table{RowsKey: "all_assets", Columns: []string{"asset_id", "input.title", "status", "created_at", "tag"}})
+			return printer.Print(cmd, resp, printer.Table{
+				RowsKey: "all_assets",
+				Columns: []string{"asset_id", "input.title", "status", "created_at"},
+				Fields: map[string]printer.Field{
+					"created_at":        {Label: "Created", Format: printer.Date(time.DateOnly, time.UnixMilli)},
+					"total_asset_count": {Label: "Total assets"},
+				},
+				Summary: []string{"total_asset_count"},
+				More:    "next_page_token",
+			})
 		},
 	}
 	listCmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace ID to list assets from")

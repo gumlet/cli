@@ -47,7 +47,7 @@ func newAddAssetCommand(newClient client.Factory) *cobra.Command {
 				return err
 			}
 
-			return printer.Print(cmd, resp, printer.Table{})
+			return printer.Print(cmd, resp, printer.Table{Result: "Assets added to playlist."})
 		},
 	}
 	addAssetCmd.Flags().String("playlist-id", "", "ID of the playlist")

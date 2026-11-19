@@ -1,6 +1,8 @@
 package asset
 
 import (
+	"time"
+
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
@@ -27,7 +29,20 @@ func newGetCommand(newClient client.Factory) *cobra.Command {
 				return err
 			}
 
-			return printer.Print(cmd, resp, printer.Table{Columns: []string{"asset_id", "input.title", "output.playback_url", "output.thumbnail_url", "status", "created_at", "updated_at", "tag", "workspace_id"}})
+			return printer.Print(cmd, resp, printer.Table{
+				Columns: []string{
+					"asset_id", "input.title", "status", "workspace_id", "input.description",
+					"input.duration", "tag", "created_at", "updated_at", "output.playback_url", "output.thumbnail_url",
+				},
+				Fields: map[string]printer.Field{
+					"input.duration":       {Label: "Duration (s)"},
+					"tag":                  {Label: "Tags", Format: printer.JoinStrings(", ")},
+					"created_at":           {Label: "Created", Format: printer.Date(printer.UTCDateTime, time.UnixMilli)},
+					"updated_at":           {Label: "Updated", Format: printer.Date(printer.UTCDateTime, time.UnixMilli)},
+					"output.playback_url":  {Format: printer.PublicLink},
+					"output.thumbnail_url": {Format: printer.PublicLink},
+				},
+			})
 		},
 	}
 	getCmd.Flags().String("asset-id", "", "ID of the asset")

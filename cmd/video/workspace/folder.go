@@ -12,6 +12,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var folderRows = printer.Table{Columns: []string{"name", "id", "parent_id", "asset_count", "subdirectory_count"}}
+
 func newFolderCommand(newClient client.Factory) *cobra.Command {
 	group := &cobra.Command{Use: "folder", Short: "Manage video workspace folders"}
 	var workspaceID string
@@ -39,7 +41,9 @@ func newFolderCommand(newClient client.Factory) *cobra.Command {
 			}
 			var raw []byte
 			_, err = api.Folders.New(cmd.Context(), workspaceID, params, option.WithResponseBodyInto(&raw))
-			return printFolder(cmd, raw, err)
+			table := folderRows
+			table.Result = "Folder created."
+			return printFolder(cmd, raw, table, err)
 		},
 	}
 	create.Flags().String("name", "", "Folder name")
@@ -63,7 +67,7 @@ func newFolderCommand(newClient client.Factory) *cobra.Command {
 			}
 			var raw []byte
 			_, err = api.Folders.List(cmd.Context(), workspaceID, params, option.WithResponseBodyInto(&raw))
-			return printFolder(cmd, raw, err)
+			return printFolder(cmd, raw, folderRows, err)
 		},
 	}
 	list.Flags().String("parent-id", "", `Filter by parent folder ID; use "null" for root folders`)
@@ -75,7 +79,13 @@ func newFolderCommand(newClient client.Factory) *cobra.Command {
 		}
 		var raw []byte
 		_, err = api.Folders.Get(cmd.Context(), workspaceID, folderID, option.WithResponseBodyInto(&raw))
-		return printFolder(cmd, raw, err)
+		return printFolder(cmd, raw, printer.Table{
+			Columns: []string{"name", "id", "parent_id", "path_names", "asset_count", "subdirectory_count", "updated_at"},
+			Fields: map[string]printer.Field{
+				"path_names": {Label: "Folder path", Format: printer.JoinStrings(" / ")},
+				"updated_at": {Label: "Updated", Format: printer.Date(printer.UTCDateTime, nil)},
+			},
+		}, err)
 	})
 	deleteFolder := newFolderByIDCommand("delete", "Delete a folder", func(cmd *cobra.Command, folderID string) error {
 		api, err := newClient()
@@ -84,7 +94,7 @@ func newFolderCommand(newClient client.Factory) *cobra.Command {
 		}
 		var raw []byte
 		_, err = api.Folders.Delete(cmd.Context(), workspaceID, folderID, option.WithResponseBodyInto(&raw))
-		return printFolder(cmd, raw, err)
+		return printFolder(cmd, raw, printer.Table{Result: "Folder deleted."}, err)
 	})
 	update := newFolderByIDCommand("update", "Rename a folder or move assets into it", func(cmd *cobra.Command, folderID string) error {
 		flags := cmd.Flags()
@@ -130,7 +140,11 @@ func newFolderCommand(newClient client.Factory) *cobra.Command {
 		}
 		var raw []byte
 		_, err = api.Folders.Update(cmd.Context(), workspaceID, folderID, sdk.FolderUpdateParams{Body: body}, option.WithResponseBodyInto(&raw))
-		return printFolder(cmd, raw, err)
+		return printFolder(cmd, raw, printer.Table{
+			Result:  "Folder updated.",
+			Columns: []string{"name", "id", "parent_id", "movedCount"},
+			Fields:  map[string]printer.Field{"movedCount": {Label: "Assets moved"}},
+		}, err)
 	})
 	update.Flags().String("name", "", "New folder name")
 	update.Flags().String("parent-id", "", "New parent folder ID")
@@ -150,7 +164,11 @@ func newFolderCommand(newClient client.Factory) *cobra.Command {
 			}
 			var raw []byte
 			_, err = api.Folders.RemoveAssets(cmd.Context(), workspaceID, sdk.FolderRemoveAssetsParams{AssetIDs: sdk.F(ids)}, option.WithResponseBodyInto(&raw))
-			return printFolder(cmd, raw, err)
+			return printFolder(cmd, raw, printer.Table{
+				Result:  "Assets removed from folders.",
+				Columns: []string{"removedCount"},
+				Fields:  map[string]printer.Field{"removedCount": {Label: "Assets removed"}},
+			}, err)
 		},
 	}
 	remove.Flags().StringSlice("asset-ids", nil, "Asset IDs to remove from folders")
@@ -195,9 +213,9 @@ func validateFolderAssetIDs(ids []string) error {
 	return nil
 }
 
-func printFolder(cmd *cobra.Command, raw []byte, err error) error {
+func printFolder(cmd *cobra.Command, raw []byte, table printer.Table, err error) error {
 	if err != nil {
 		return err
 	}
-	return printer.Print(cmd, raw, printer.Table{})
+	return printer.Print(cmd, raw, table)
 }

@@ -27,7 +27,22 @@ func newGetCommand(newClient client.Factory) *cobra.Command {
 				return err
 			}
 
-			return printer.Print(cmd, resp, printer.Table{Columns: []string{"id", "name", "type", "created_at", "updated_at"}})
+			timestamp := printer.Date(printer.UTCDateTime, nil)
+			return printer.Print(cmd, resp, printer.Table{
+				Columns: []string{"id", "name", "type", "created_at", "updated_at"},
+				Summary: []string{
+					"default_profile_id", "video_protection.signed_url",
+					"channel_settings.title", "channel_settings.privacy_type",
+				},
+				Fields: map[string]printer.Field{
+					"created_at":                    {Label: "Created", Format: timestamp},
+					"updated_at":                    {Label: "Updated", Format: timestamp},
+					"default_profile_id":            {Label: "Default profile ID"},
+					"video_protection.signed_url":   {Label: "Signed URLs"},
+					"channel_settings.title":        {Label: "Channel title"},
+					"channel_settings.privacy_type": {Label: "Channel privacy"},
+				},
+			})
 		},
 	}
 	getCmd.Flags().String("workspace-id", "", "ID of the workspace")

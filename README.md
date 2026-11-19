@@ -179,8 +179,13 @@ is no longer supported.
 
 API commands default to `--output json`. JSON preserves the API's field names,
 nested values, and pagination metadata; an empty response writes nothing.
-Choose `-o table` for a terminal view, and `--no-color` to disable styling.
-Upload progress and command errors go to stderr. Failures exit nonzero.
+Choose `-o table` for a concise view with fields selected for each command.
+Lists show one row per item, including one row per invoice in
+`gumlet billing invoice history -o table`. Tables indicate when the API reports
+more results; use JSON to retrieve cursors, full details, or links omitted from
+tables. Successful mutations may print a short confirmation even when the API
+returns no body. Use `--no-color` to disable styling.
+Upload progress and command errors go to stderr. Command errors exit nonzero.
 
 For scripts migrating from older versions: read nested JSON fields instead of
 flattened labels, use `--page-size` and `--page-number` or `--next-page-token`

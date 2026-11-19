@@ -62,7 +62,7 @@ func newReorderCommand(newClient client.Factory) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return printer.Print(cmd, raw, printer.Table{})
+			return printer.Print(cmd, raw, printer.Table{Result: "Playlist reordered."})
 		},
 	}
 	cmd.Flags().StringVar(&playlistID, "playlist-id", "", "ID of the playlist")

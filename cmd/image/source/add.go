@@ -53,7 +53,10 @@ func newAddCommand(newClient client.Factory) *cobra.Command {
 				return err
 			}
 
-			return printer.Print(cmd, resp, printer.Table{Columns: []string{"id", "namespace", "type", "created_at"}})
+			return printer.Print(cmd, resp, printer.Table{
+				Result:  "Image source added.",
+				Columns: []string{"id", "namespace", "type"},
+			})
 		},
 	}
 	addCmd.Flags().String("namespace", "", "Subdomain for the image source (e.g. mycompany.gumlet.com)")

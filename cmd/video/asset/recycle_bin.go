@@ -1,8 +1,10 @@
 package asset
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
@@ -43,7 +45,20 @@ func newListRecoverableCommand(newClient client.Factory) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return printer.Print(cmd, raw, printer.Table{RowsKey: "all_assets", Columns: []string{"asset_id", "title", "deleted_at"}})
+			return printer.Print(cmd, raw, printer.Table{
+				RowsKey: "all_assets",
+				Columns: []string{"asset_id", "title", "deleted_at"},
+				Fields: map[string]printer.Field{
+					"deleted_at":        {Label: "Deleted", Format: printer.Date(printer.UTCDateTime, time.UnixMilli)},
+					"total_asset_count": {Label: "Total recoverable assets"},
+				},
+				Summary: []string{"total_asset_count"},
+				HasMore: func(root map[string]any) bool {
+					total, _ := root["total_asset_count"].(json.Number)
+					n, err := total.Int64()
+					return err == nil && n > 0 && (n-1)/pageSize >= pageNumber
+				},
+			})
 		},
 	}
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "ID of the workspace")
@@ -70,7 +85,7 @@ func newRecoverCommand(newClient client.Factory) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return printer.Print(cmd, raw, printer.Table{})
+			return printer.Print(cmd, raw, printer.Table{Result: "Asset recovered."})
 		},
 	}
 	cmd.Flags().StringVar(&assetID, "asset-id", "", "ID of the deleted asset")

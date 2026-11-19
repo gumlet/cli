@@ -1,12 +1,9 @@
 package live
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
@@ -55,47 +52,5 @@ func runRequest(cmd *cobra.Command, newClient client.Factory, table printer.Tabl
 			return errors.New("live API request failed; check your connection and retry if safe")
 		}
 	}
-	format, _ := cmd.Flags().GetString("output")
-	if format == "json" || len(bytes.TrimSpace(raw)) == 0 {
-		return printer.Print(cmd, raw, table)
-	}
-	if len(table.Columns) == 0 {
-		_, err := fmt.Fprintln(cmd.OutOrStdout(), "Request succeeded. Use --output json to see the response; it may contain credentials.")
-		return err
-	}
-	safe, err := tableResponse(raw, table)
-	if err != nil {
-		return err
-	}
-	return printer.Print(cmd, safe, table)
-}
-
-// Project live tables onto known scalar fields before sending them to the
-// printer. Unexpected response shapes must not expose the unfiltered payload.
-func tableResponse(raw []byte, table printer.Table) ([]byte, error) {
-	var response map[string]json.RawMessage
-	if json.Unmarshal(raw, &response) != nil || response == nil {
-		return nil, errors.New("live API returned an unexpected response shape")
-	}
-	project := func(row map[string]json.RawMessage) map[string]json.RawMessage {
-		safe := make(map[string]json.RawMessage)
-		for _, column := range table.Columns {
-			value := bytes.TrimSpace(row[column])
-			if len(value) != 0 && !strings.ContainsRune("{[", rune(value[0])) {
-				safe[column] = value
-			}
-		}
-		return safe
-	}
-	if table.RowsKey == "" {
-		return json.Marshal(project(response))
-	}
-	var rows []map[string]json.RawMessage
-	if json.Unmarshal(response[table.RowsKey], &rows) != nil {
-		return nil, errors.New("live API returned an unexpected list shape")
-	}
-	for i, row := range rows {
-		rows[i] = project(row)
-	}
-	return json.Marshal(map[string]any{table.RowsKey: rows})
+	return printer.Print(cmd, raw, table)
 }

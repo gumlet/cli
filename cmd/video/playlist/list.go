@@ -30,7 +30,10 @@ func newListCommand(newClient client.Factory) *cobra.Command {
 				return err
 			}
 
-			return printer.Print(cmd, resp, printer.Table{Columns: []string{"id", "workspace_id", "title", "description"}})
+			return printer.Print(cmd, resp, printer.Table{
+				Columns: []string{"id", "title"},
+				Fields:  map[string]printer.Field{"id": {Label: "Playlist ID"}},
+			})
 		},
 	}
 	listCmd.Flags().String("workspace-id", "", "Workspace ID to list playlists for")

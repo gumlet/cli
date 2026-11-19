@@ -27,7 +27,7 @@ func newDeleteCommand(newClient client.Factory) *cobra.Command {
 				return err
 			}
 
-			return printer.Print(cmd, resp, printer.Table{})
+			return printer.Print(cmd, resp, printer.Table{Result: "Asset deleted."})
 		},
 	}
 	deleteCmd.Flags().String("asset-id", "", "ID of the asset to delete")

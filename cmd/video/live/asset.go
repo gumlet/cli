@@ -16,7 +16,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var assetTable = printer.Table{Columns: []string{"live_asset_id", "status", "vod_asset_id", "created_at", "updated_at"}}
+var assetTimeFields = map[string]printer.Field{
+	"created_at": {Label: "Created", Format: printer.Date(printer.UTCDateTime, time.UnixMilli)},
+	"updated_at": {Label: "Updated", Format: printer.Date(printer.UTCDateTime, time.UnixMilli)},
+}
+
+var assetTable = printer.Table{
+	Columns: []string{"live_asset_id", "input.title", "status", "vod_asset_id", "created_at", "updated_at"},
+	Fields:  assetTimeFields,
+}
 
 func newAssetCommand(newClient client.Factory) *cobra.Command {
 	group := &cobra.Command{Use: "asset", Short: "Manage live streams"}
@@ -27,21 +35,24 @@ func newAssetCommand(newClient client.Factory) *cobra.Command {
 				_, err := api.LiveAssets.GetStatus(ctx, id, opt)
 				return err
 			}),
-		newAssetAction(newClient, "delete", "Delete a live stream", printer.Table{},
+		newAssetAction(newClient, "delete", "Delete a live stream", printer.Table{Result: "Live stream deleted."},
 			func(ctx context.Context, api *client.Client, id string, opt option.RequestOption) error {
 				_, err := api.LiveAssets.Delete(ctx, id, opt)
 				return err
 			}),
-		newAssetAction(newClient, "start", "Start a live stream", printer.Table{},
+		newAssetAction(newClient, "start", "Start a live stream", printer.Table{Result: "Live stream start requested."},
 			func(ctx context.Context, api *client.Client, id string, opt option.RequestOption) error {
 				return api.LiveAssets.Start(ctx, id, opt)
 			}),
-		newAssetAction(newClient, "complete", "Complete a live stream", printer.Table{},
+		newAssetAction(newClient, "complete", "Complete a live stream", printer.Table{Result: "Live stream completion requested."},
 			func(ctx context.Context, api *client.Client, id string, opt option.RequestOption) error {
 				_, err := api.LiveAssets.Complete(ctx, id, opt)
 				return err
 			}),
-		newAssetAction(newClient, "history", "Get live stream status history", assetTable,
+		newAssetAction(newClient, "history", "Get live stream status history", printer.Table{
+			Columns: []string{"live_asset_id", "input.title", "status", "created_at", "updated_at"},
+			Fields:  assetTimeFields,
+		},
 			func(ctx context.Context, api *client.Client, id string, opt option.RequestOption) error {
 				_, err := api.LiveAssets.StatusHistory(ctx, id, opt)
 				return err
@@ -98,7 +109,9 @@ func newAssetCreate(newClient client.Factory) *cobra.Command {
 			}
 			params.StartAt = sdk.F(value)
 		}
-		return runRequest(cmd, newClient, assetTable, func(ctx context.Context, api *client.Client, opt option.RequestOption) error {
+		table := assetTable
+		table.Result = "Live stream created."
+		return runRequest(cmd, newClient, table, func(ctx context.Context, api *client.Client, opt option.RequestOption) error {
 			_, err := api.LiveAssets.New(ctx, params, opt)
 			return err
 		})
@@ -129,7 +142,9 @@ func newAssetUpdate(newClient client.Factory) *cobra.Command {
 			}
 			params.StartAt = sdk.F(value)
 		}
-		return runRequest(cmd, newClient, assetTable, func(ctx context.Context, api *client.Client, opt option.RequestOption) error {
+		table := assetTable
+		table.Result = "Live stream updated."
+		return runRequest(cmd, newClient, table, func(ctx context.Context, api *client.Client, opt option.RequestOption) error {
 			_, err := api.LiveAssets.Update(ctx, params, opt)
 			return err
 		})
@@ -176,8 +191,12 @@ func newAssetList(newClient client.Factory) *cobra.Command {
 		if page.Token != "" {
 			params.NextPageToken = sdk.F(page.Token)
 		}
-		table := assetTable
-		table.RowsKey = "all_live_assets"
+		table := printer.Table{
+			RowsKey: "all_live_assets",
+			Columns: []string{"live_asset_id", "input.title", "status", "updated_at"},
+			Fields:  assetTimeFields,
+			More:    "next_page_token",
+		}
 		return runRequest(cmd, newClient, table, func(ctx context.Context, api *client.Client, opt option.RequestOption) error {
 			_, err := api.LiveAssets.Filter(ctx, workspaceID, params, opt)
 			return err
@@ -199,7 +218,7 @@ func newThumbnailURLs(newClient client.Factory) *cobra.Command {
 		if err := validateChoices(statuses, "statuses", []string{"preparing", "disconnected", "end"}); err != nil {
 			return err
 		}
-		return runRequest(cmd, newClient, printer.Table{}, func(ctx context.Context, api *client.Client, opt option.RequestOption) error {
+		return runRequest(cmd, newClient, printer.Table{Result: "Thumbnail upload URLs requested. Use --output json to retrieve them."}, func(ctx context.Context, api *client.Client, opt option.RequestOption) error {
 			_, err := api.LiveAssets.Upload(ctx, sdk.LiveStreamAssetUploadParams{
 				LiveAssetID: sdk.F(id), Statuses: sdk.F[any](statuses),
 			}, opt)

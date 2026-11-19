@@ -27,7 +27,16 @@ func newListCommand(newClient client.Factory) *cobra.Command {
 				return err
 			}
 
-			return printer.Print(cmd, resp, printer.Table{RowsKey: "all_sources", Columns: []string{"id", "namespace", "type", "cname", "created_at"}})
+			return printer.Print(cmd, resp, printer.Table{
+				RowsKey: "all_sources",
+				Columns: []string{"id", "namespace", "type", "cname"},
+				Fields: map[string]printer.Field{
+					"cname":       {Label: "Custom domains", Format: printer.JoinStrings(", ")},
+					"total_count": {Label: "Total sources"},
+				},
+				Summary: []string{"total_count"},
+				More:    "next_page_token",
+			})
 		},
 	}
 	return listCmd

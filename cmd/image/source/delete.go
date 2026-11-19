@@ -27,7 +27,7 @@ func newDeleteCommand(newClient client.Factory) *cobra.Command {
 				return err
 			}
 
-			return printer.Print(cmd, resp, printer.Table{})
+			return printer.Print(cmd, resp, printer.Table{Result: "Image source deleted."})
 		},
 	}
 	deleteCmd.Flags().String("source-id", "", "ID of the image source to delete")

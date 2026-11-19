@@ -101,7 +101,10 @@ func newUploadCommand(newClient client.Factory) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return printer.Print(cmd, data, printer.Table{Columns: []string{"asset_id", "uploaded"}})
+			return printer.Print(cmd, data, printer.Table{
+				Columns: []string{"asset_id"},
+				Result:  "Asset uploaded.",
+			})
 		},
 	}
 	uploadCmd.Flags().String("file", "", "Path to the local video file to upload")

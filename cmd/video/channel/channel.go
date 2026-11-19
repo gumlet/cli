@@ -67,7 +67,13 @@ func newListCommand(newClient client.Factory) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return printer.Print(cmd, raw, printer.Table{RowsKey: "subscriptions"})
+		return printer.Print(cmd, raw, printer.Table{
+			RowsKey: "subscriptions",
+			Columns: []string{"name", "email", "status"},
+			Fields:  map[string]printer.Field{"total_count": {Label: "Total subscribers"}},
+			Summary: []string{"total_count"},
+			More:    "next_page_token",
+		})
 	})
 	page.Bind(cmd)
 	return cmd
@@ -91,7 +97,7 @@ func newInviteCommand(newClient client.Factory) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return printer.Print(cmd, raw, printer.Table{})
+		return printer.Print(cmd, raw, printer.Table{Result: "Viewers invited."})
 	})
 	cmd.Flags().StringVar(&file, "viewers-file", "", "JSON file of {email,name} entries (use - for stdin)")
 	cmd.MarkFlagRequired("viewers-file")
@@ -120,7 +126,7 @@ func newRemoveCommand(newClient client.Factory) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return printer.Print(cmd, raw, printer.Table{})
+		return printer.Print(cmd, raw, printer.Table{Result: "Viewers removed."})
 	})
 	cmd.Flags().StringSliceVar(&emails, "emails", nil, "Comma-separated viewer email addresses")
 	cmd.MarkFlagRequired("emails")

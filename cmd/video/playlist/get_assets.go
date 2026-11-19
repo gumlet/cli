@@ -1,6 +1,8 @@
 package playlist
 
 import (
+	"time"
+
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
@@ -28,7 +30,15 @@ func newGetAssetsCommand(newClient client.Factory) *cobra.Command {
 				return err
 			}
 
-			return printer.Print(cmd, resp, printer.Table{RowsKey: "asset_list", Columns: []string{"id", "title", "status", "created_at", "duration"}})
+			return printer.Print(cmd, resp, printer.Table{
+				RowsKey: "asset_list",
+				Columns: []string{"id", "title", "status", "created_at", "duration"},
+				Fields: map[string]printer.Field{
+					"id":         {Label: "Asset ID"},
+					"created_at": {Label: "Created", Format: printer.Date(time.DateOnly, nil)},
+				},
+				More: "has_next_page",
+			})
 		},
 	}
 	getAssetsCmd.Flags().String("playlist-id", "", "ID of the playlist")

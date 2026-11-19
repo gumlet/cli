@@ -27,7 +27,7 @@ func newDeleteCommand(newClient client.Factory) *cobra.Command {
 				return err
 			}
 
-			return printer.Print(cmd, resp, printer.Table{})
+			return printer.Print(cmd, resp, printer.Table{Result: "Playlist deleted."})
 		},
 	}
 	deleteCmd.Flags().String("playlist-id", "", "ID of the playlist to delete")

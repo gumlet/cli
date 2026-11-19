@@ -27,7 +27,14 @@ func newListCommand(newClient client.Factory) *cobra.Command {
 				return err
 			}
 
-			return printer.Print(cmd, resp, printer.Table{RowsKey: "all_sources", Columns: []string{"id", "name", "type", "created_at"}})
+			return printer.Print(cmd, resp, printer.Table{
+				RowsKey: "all_sources",
+				Columns: []string{"id", "name", "type", "created_at"},
+				Fields: map[string]printer.Field{
+					"created_at": {Label: "Created", Format: printer.Date("2006-01-02", nil)},
+				},
+				More: "next_page_token",
+			})
 		},
 	}
 	return listCmd

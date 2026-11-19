@@ -30,7 +30,9 @@ func newWorkspaceCommand(newClient client.Factory) *cobra.Command {
 		if strings.TrimSpace(createName) == "" {
 			return fmt.Errorf("--name must not be empty")
 		}
-		return runRequest(cmd, newClient, workspaceTable, func(ctx context.Context, api *client.Client, opt option.RequestOption) error {
+		table := workspaceTable
+		table.Result = "Live workspace created."
+		return runRequest(cmd, newClient, table, func(ctx context.Context, api *client.Client, opt option.RequestOption) error {
 			_, err := api.LiveWorkspaces.New(ctx, sdk.LiveStreamWorkspaceNewParams{Name: sdk.F(createName)}, opt)
 			return err
 		})
@@ -55,7 +57,9 @@ func newWorkspaceCommand(newClient client.Factory) *cobra.Command {
 			}
 			params.VideoSourceID = sdk.F(vodWorkspace)
 		}
-		return runRequest(cmd, newClient, workspaceTable, func(ctx context.Context, api *client.Client, opt option.RequestOption) error {
+		table := workspaceTable
+		table.Result = "Live workspace updated."
+		return runRequest(cmd, newClient, table, func(ctx context.Context, api *client.Client, opt option.RequestOption) error {
 			_, err := api.LiveWorkspaces.Update(ctx, updateID, params, opt)
 			return err
 		})
@@ -70,7 +74,7 @@ func newWorkspaceCommand(newClient client.Factory) *cobra.Command {
 		if strings.TrimSpace(deleteID) == "" {
 			return fmt.Errorf("--live-workspace-id must not be empty")
 		}
-		return runRequest(cmd, newClient, printer.Table{}, func(ctx context.Context, api *client.Client, opt option.RequestOption) error {
+		return runRequest(cmd, newClient, printer.Table{Result: "Live workspace deleted."}, func(ctx context.Context, api *client.Client, opt option.RequestOption) error {
 			_, err := api.LiveWorkspaces.Delete(ctx, deleteID, opt)
 			return err
 		})

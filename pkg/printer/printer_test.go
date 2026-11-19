@@ -66,6 +66,77 @@ func TestStyledTableHeaderAlignment(t *testing.T) {
 	}
 }
 
+func TestTableAllowlistAndPagination(t *testing.T) {
+	const id = "an-important-identifier-that-is-longer-than-the-old-fifty-character-limit"
+	const title = "This description is longer than the human-friendly width for prose fields."
+	table := Table{
+		RowsKey: "data.rows",
+		Columns: []string{"id", "title", "nested.value", "roles", "count"},
+		Fields: map[string]Field{
+			"nested.value": {Label: "Selected value"},
+			"roles":        {Format: JoinStrings(", ")},
+		},
+		More:    "data.next_page_token",
+		Summary: []string{"unpaid"},
+	}
+	data := []byte(`{"data":{"rows":[{"id":"` + id + `","title":"` + title + `","nested":{"value":{"secret":"private-object"}},"roles":["editor","viewer"],"count":0}],"next_page_token":"private-cursor"},"unpaid":false}`)
+	var out bytes.Buffer
+	if err := printTable(&out, data, table, false); err != nil {
+		t.Fatal(err)
+	}
+	text := out.String()
+	for _, want := range []string{id, "SELECTED VALUE", "editor, viewer", "0\n", "—", "UNPAID", "false", "More results are available."} {
+		if !strings.Contains(text, want) {
+			t.Errorf("wanted %q in %q", want, text)
+		}
+	}
+	if !strings.Contains(text, "…") || strings.Contains(text, title) || strings.Contains(text, "private-") {
+		t.Errorf("unexpected contents: %q", text)
+	}
+}
+
+func TestTableResult(t *testing.T) {
+	const success = "Asset deleted."
+	for _, tc := range []struct {
+		name, body, want string
+	}{
+		{"empty", "", success},
+		{"null", "null", success},
+		{"success", `{"success":true}`, success},
+		{"false", "false", "API reported failure."},
+		{"false flag", `{"deleted":false}`, "API reported failure."},
+		{"status", `{"status":"FAILED"}`, "API reported failure."},
+		{"error object", `{"error":{"reason":"private-error-detail"}}`, "API reported failure."},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var out bytes.Buffer
+			if err := printTable(&out, []byte(tc.body), Table{Result: success}, false); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.HasPrefix(out.String(), tc.want) || strings.Contains(out.String(), "private-") {
+				t.Errorf("got %q, want a safe %q", out.String(), tc.want)
+			}
+		})
+	}
+}
+
+func TestTableRejectsUnconfiguredViewsAndMalformedRows(t *testing.T) {
+	for _, tc := range []struct {
+		data  string
+		table Table
+	}{
+		{`{"sensitive":"private"}`, Table{}},
+		{`{"rows":true}`, Table{RowsKey: "rows", Columns: []string{"id"}}},
+		{`{"rows":[{"id":"one"},"private"]}`, Table{RowsKey: "rows", Columns: []string{"id"}}},
+		{`{"unknown":[]}`, Table{RowsKey: "rows", Columns: []string{"id"}}},
+	} {
+		var out bytes.Buffer
+		if err := printTable(&out, []byte(tc.data), tc.table, false); err == nil || out.Len() != 0 {
+			t.Errorf("unsafe output %q, err=%v", out.String(), err)
+		}
+	}
+}
+
 type errorWriter struct{ err error }
 
 func (w errorWriter) Write([]byte) (int, error) { return 0, w.err }

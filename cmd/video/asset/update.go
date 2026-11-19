@@ -83,7 +83,7 @@ func newUpdateCommand(newClient client.Factory) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return printer.Print(cmd, raw, printer.Table{})
+			return printer.Print(cmd, raw, printer.Table{Result: "Asset updated."})
 		},
 	}
 	cmd.Flags().StringVar(&assetID, "asset-id", "", "ID of the asset")

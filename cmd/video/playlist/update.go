@@ -42,7 +42,11 @@ func newUpdateCommand(newClient client.Factory) *cobra.Command {
 				return err
 			}
 
-			return printer.Print(cmd, resp, printer.Table{Columns: []string{"id", "workspace_id", "title", "description"}})
+			return printer.Print(cmd, resp, printer.Table{
+				Columns: []string{"id", "title", "workspace_id", "description"},
+				Fields:  map[string]printer.Field{"id": {Label: "Playlist ID"}},
+				Result:  "Playlist updated.",
+			})
 		},
 	}
 	updateCmd.Flags().String("playlist-id", "", "ID of the playlist to update")

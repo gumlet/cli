@@ -28,7 +28,10 @@ func newCreateCommand(newClient client.Factory) *cobra.Command {
 				return err
 			}
 
-			return printer.Print(cmd, resp, printer.Table{Columns: []string{"id", "name", "type", "created_at"}})
+			return printer.Print(cmd, resp, printer.Table{
+				Result:  "Workspace created.",
+				Columns: []string{"id", "name", "type"},
+			})
 		},
 	}
 	createCmd.Flags().String("name", "", "Name of the new workspace")
