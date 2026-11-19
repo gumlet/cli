@@ -12,5 +12,6 @@ func NewCommand(newClient client.Factory) *cobra.Command {
 		Short: "Manage video playlists",
 	}
 	cmd.AddCommand(newAddAssetCommand(newClient), newCreateCommand(newClient), newDeleteCommand(newClient), newGetAssetsCommand(newClient), newListCommand(newClient), newRemoveAssetCommand(newClient), newUpdateCommand(newClient))
+	cmd.AddCommand(newReorderCommand(newClient))
 	return cmd
 }

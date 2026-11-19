@@ -32,6 +32,7 @@ func (f testTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 
 func runCLI(t *testing.T, baseURL, input string, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
+	const version = "1.2.3"
 	target, err := url.Parse(baseURL)
 	if err != nil {
 		t.Fatal(err)
@@ -41,6 +42,9 @@ func runCLI(t *testing.T, baseURL, input string, args ...string) (stdout, stderr
 	httpClient := &http.Client{Transport: testTransport(func(r *http.Request) (*http.Response, error) {
 		if r.URL.Scheme != "https" || r.URL.Host != "api.gumlet.com" {
 			return nil, fmt.Errorf("unexpected API origin: %s://%s", r.URL.Scheme, r.URL.Host)
+		}
+		if got := r.Header.Get("User-Agent"); got != "gumlet-cli/"+version {
+			t.Errorf("unexpected API User-Agent: %q", got)
 		}
 		r = r.Clone(r.Context())
 		r.URL.Scheme, r.URL.Host, r.Host = target.Scheme, target.Host, target.Host
@@ -56,12 +60,12 @@ func runCLI(t *testing.T, baseURL, input string, args ...string) (stdout, stderr
 	t.Setenv("GUMLET_CUSTOM_HEADERS", "X-Unexpected: injected")
 	t.Setenv("API_KEY", "wrong-key")
 
-	root := cmd.NewRootCommand(cmd.Options{NewClient: func() (*client.Client, error) {
+	root := cmd.NewRootCommand(cmd.Options{Version: version, NewClient: func() (*client.Client, error) {
 		key, err := store.APIKey()
 		if err != nil {
 			return nil, err
 		}
-		return client.New(key, option.WithHTTPClient(httpClient)), nil
+		return client.New(key, version, option.WithHTTPClient(httpClient)), nil
 	}})
 	var out, diagnostics bytes.Buffer
 	root.SetOut(&out)
@@ -97,8 +101,44 @@ func TestSDKRequests(t *testing.T) {
 		{"empty delete", "DELETE", "/v1/video/assets/asset", "", "", "", "", []string{"video", "asset", "delete", "--asset-id", "asset"}, 204},
 		{"legacy source config", "POST", "/v1/image/sources", "", `{"namespace":"test","type":"amazon","amazon":{"bucket_name":"example"}}`, `{"id":"src"}`, `{"id":"src"}`, []string{"image", "source", "add", "--namespace", "test", "--type", "amazon", "--config", `{"bucket_name":"example"}`}, 200},
 		{"legacy source update", "POST", "/v1/image/sources/src", "", `{"type":"amazon","amazon":{"bucket_name":"example"}}`, `{"id":"src"}`, `{"id":"src"}`, []string{"image", "source", "update", "--source-id", "src", "--type", "amazon", "--config", `{"bucket_name":"example"}`}, 200},
-		{"full purge", "POST", "/v1/purge/example", "", `{"paths":[]}`, "", "", []string{"image", "purge", "--subdomain", "example"}, 204},
+		{"source purge", "POST", "/v1/image/purge/src", "", `{"paths":["/photo.jpg","banner.png"]}`, `{"status":"ok"}`, `{"status":"ok"}`, []string{"image", "purge", "--source-id", "src", "--urls", "/photo.jpg,banner.png"}, 200},
+		{"current user", "GET", "/v1/user/data", "", "", `{"id":"u","email":"viewer@example.com","roles":["admin"]}`, `{"id":"u","email":"viewer@example.com","roles":["admin"]}`, []string{"user", "get"}, 200},
+		{"invoice history", "GET", "/v1/mixed/billing/invoice/history", "", "", `{"stripe_invoices":[{"id":"invoice"}],"unpaid_invoices":true}`, `{"stripe_invoices":[{"id":"invoice"}],"unpaid_invoices":true}`, []string{"billing", "invoice", "history"}, 200},
+		{"upcoming invoice", "GET", "/v1/mixed/billing/invoice/upcoming", "", "", `{"upcoming_invoice":{"amount":200},"current_month_usage":{"extra":10}}`, `{"upcoming_invoice":{"amount":200},"current_month_usage":{"extra":10}}`, []string{"billing", "invoice", "upcoming"}, 200},
+		{"channel viewers page", "GET", "/v1/channel/ws/viewers", "page_number=2&page_size=25", "", `{"subscriptions":[{"email":"viewer@example.com"}],"total_count":1}`, `{"subscriptions":[{"email":"viewer@example.com"}],"total_count":1}`, []string{"video", "channel", "viewer", "list", "--workspace-id", "ws", "--page-number", "2", "--page-size", "25"}, 200},
+		{"channel viewers cursor", "GET", "/v1/channel/ws/viewers", "next_page_token=viewer%2Bnext", "", `{"subscriptions":[],"next_page_token":"next"}`, `{"subscriptions":[],"next_page_token":"next"}`, []string{"video", "channel", "viewer", "list", "--workspace-id", "ws", "--next-page-token", "viewer+next"}, 200},
+		{"channel viewer remove", "POST", "/v1/channel/ws/viewers/remove", "", `{"emails":["one@example.com","two@example.com"]}`, `{"success":true}`, `{"success":true}`, []string{"video", "channel", "viewer", "remove", "--workspace-id", "ws", "--emails", "one@example.com,two@example.com"}, 200},
+		{"live workspace list", "GET", "/v1/video/sources/live", "", "", `{"all_live_sources":[{"id":"lw","name":"Studio"}]}`, `{"all_live_sources":[{"id":"lw","name":"Studio"}]}`, []string{"video", "live", "workspace", "list"}, 200},
+		{"live workspace create", "POST", "/v1/video/sources/live", "", `{"name":"Studio"}`, `{"id":"lw"}`, `{"id":"lw"}`, []string{"video", "live", "workspace", "create", "--name", "Studio"}, 200},
+		{"live workspace update", "POST", "/v1/video/sources/live/lw", "", `{"name":"New","video_source_id":"vod"}`, `{"id":"lw","video_workspace_id":"vod"}`, `{"id":"lw","video_workspace_id":"vod"}`, []string{"video", "live", "workspace", "update", "--live-workspace-id", "lw", "--name", "New", "--video-workspace-id", "vod"}, 200},
+		{"live workspace delete", "DELETE", "/v1/video/sources/live/lw", "", "", `{"success":true}`, `{"success":true}`, []string{"video", "live", "workspace", "delete", "--live-workspace-id", "lw"}, 200},
+		{"live asset create", "POST", "/v1/video/live/assets", "", `{"live_source_id":"lw","resolution":"720p","title":"Talk","mp4_access":false,"orientation":"landscape","start_at":"2026-12-01T15:00:00Z"}`, `{"live_asset_id":"la","stream_key":"fixture-key"}`, `{"live_asset_id":"la","stream_key":"fixture-key"}`, []string{"video", "live", "asset", "create", "--live-workspace-id", "lw", "--resolution", "720p", "--title", "Talk", "--mp4-access=false", "--orientation", "landscape", "--start-at", "2026-12-01T15:00:00Z"}, 200},
+		{"live asset update", "POST", "/v1/video/live/assets/update", "", `{"live_asset_id":"la","title":"","start_at":"2026-12-01T15:00:00Z"}`, `{"live_asset_id":"la"}`, `{"live_asset_id":"la"}`, []string{"video", "live", "asset", "update", "--live-asset-id", "la", "--title=", "--start-at", "2026-12-01T15:00:00Z"}, 200},
+		{"live asset list", "GET", "/v1/video/live/assets/list/lw", "next_page_token=next%2B1&page_size=10&status=created%2Cactive", "", `{"all_live_assets":[{"live_asset_id":"la"}],"next_page_token":"next"}`, `{"all_live_assets":[{"live_asset_id":"la"}],"next_page_token":"next"}`, []string{"video", "live", "asset", "list", "--live-workspace-id", "lw", "--status", "created,active", "--page-size", "10", "--next-page-token", "next+1"}, 200},
+		{"live asset get", "GET", "/v1/video/live/assets/la", "", "", `{"status":"active"}`, `{"status":"active"}`, []string{"video", "live", "asset", "get", "--live-asset-id", "la"}, 200},
+		{"live asset delete", "DELETE", "/v1/video/live/assets/la", "", "", "", "", []string{"video", "live", "asset", "delete", "--live-asset-id", "la"}, 204},
+		{"live asset start", "POST", "/v1/video/live/assets/la/start", "", "", "", "", []string{"video", "live", "asset", "start", "--live-asset-id", "la"}, 200},
+		{"live asset complete", "POST", "/v1/video/live/assets/la/complete", "", "", `{"status":"complete"}`, `{"status":"complete"}`, []string{"video", "live", "asset", "complete", "--live-asset-id", "la"}, 200},
+		{"live asset history", "GET", "/v1/video/live/assets/la/history", "", "", `{"status":"complete","events":[{"status":"active"}]}`, `{"status":"complete","events":[{"status":"active"}]}`, []string{"video", "live", "asset", "history", "--live-asset-id", "la"}, 200},
+		{"live thumbnail URLs", "POST", "/v1/video/live/assets/thumbnail/upload", "", `{"live_asset_id":"la","statuses":["preparing","end"]}`, `{"presigned_upload_urls":{"preparing":"https://example.com/upload?signature=fixture"}}`, `{"presigned_upload_urls":{"preparing":"https://example.com/upload?signature=fixture"}}`, []string{"video", "live", "asset", "thumbnail-upload-urls", "--live-asset-id", "la", "--statuses", "preparing,end"}, 200},
 		{"failed mutation", "POST", "/v1/video/workspaces", "", `{"name":"Example"}`, `{"message":"unavailable"}`, "", []string{"video", "workspace", "create", "--name", "Example"}, 503},
+		{"folder create", "POST", "/v1/video/workspaces/ws/folders", "", `{"name":"Clips"}`, `{"id":"folder"}`, `{"id":"folder"}`, []string{"video", "workspace", "folder", "create", "--workspace-id", "ws", "--name", "Clips"}, 200},
+		{"nested folder create", "POST", "/v1/video/workspaces/ws/folders", "", `{"name":"Clips","parent_id":"parent"}`, `{"id":"folder"}`, `{"id":"folder"}`, []string{"video", "workspace", "folder", "create", "--workspace-id", "ws", "--name", "Clips", "--parent-id", "parent"}, 200},
+		{"folder list", "GET", "/v1/video/workspaces/ws/folders", "parent_id=parent%2B1", "", `[{"id":"folder"}]`, `[{"id":"folder"}]`, []string{"video", "workspace", "folder", "list", "--workspace-id", "ws", "--parent-id", "parent+1"}, 200},
+		{"root folder list", "GET", "/v1/video/workspaces/ws/folders", "parent_id=null", "", `[]`, `[]`, []string{"video", "workspace", "folder", "list", "--workspace-id", "ws", "--parent-id", "null"}, 200},
+		{"folder get", "GET", "/v1/video/workspaces/ws/folders/folder", "", "", `{"id":"folder"}`, `{"id":"folder"}`, []string{"video", "workspace", "folder", "get", "--workspace-id", "ws", "--folder-id", "folder"}, 200},
+		{"folder update", "POST", "/v1/video/workspaces/ws/folders/folder", "", `{"asset_ids":["one","two"]}`, `{"id":"folder"}`, `{"id":"folder"}`, []string{"video", "workspace", "folder", "update", "--workspace-id", "ws", "--folder-id", "folder", "--asset-ids", "one,two"}, 200},
+		{"folder move to root", "POST", "/v1/video/workspaces/ws/folders/folder", "", `{"name":"Clips","parent_id":null}`, `{"id":"folder"}`, `{"id":"folder"}`, []string{"video", "workspace", "folder", "update", "--workspace-id", "ws", "--folder-id", "folder", "--name", "Clips", "--root"}, 200},
+		{"folder delete", "DELETE", "/v1/video/workspaces/ws/folders/folder", "", "", "", "", []string{"video", "workspace", "folder", "delete", "--workspace-id", "ws", "--folder-id", "folder"}, 204},
+		{"folder remove assets", "POST", "/v1/video/workspaces/ws/remove-assets-from-folder", "", `{"asset_ids":["one","two"]}`, "", "", []string{"video", "workspace", "folder", "remove-assets", "--workspace-id", "ws", "--asset-ids", "one,two"}, 204},
+		{"asset update", "POST", "/v1/video/assets/update", "", `{"asset_id":"one","description":"","reprocess":false,"remove_subtitles":[]}`, `{"asset_id":"one","extra":true}`, `{"asset_id":"one","extra":true}`, []string{"video", "asset", "update", "--asset-id", "one", "--description=", "--reprocess=false", "--remove-subtitles="}, 200},
+		{"recoverable list", "GET", "/v1/video/asset/recoverable/list", "page_number=2&page_size=25&workspace_id=ws", "", `{"all_assets":[],"total_asset_count":0}`, `{"all_assets":[],"total_asset_count":0}`, []string{"video", "asset", "list-recoverable", "--workspace-id", "ws", "--page-number", "2", "--page-size", "25"}, 200},
+		{"asset recover", "POST", "/v1/video/asset/recover", "", `{"asset_id":"one"}`, "", "", []string{"video", "asset", "recover", "--asset-id", "one"}, 204},
+		{"bulk tag add", "POST", "/v1/video/assets/bulk/tag", "", `{"workspace_id":"ws","asset_list":["one","two"],"add_tags":["promo"],"remove_tags":[]}`, `{"ok":true}`, `{"ok":true}`, []string{"video", "asset", "bulk-tag", "--workspace-id", "ws", "--asset-ids", "one,two", "--add-tags", "promo"}, 200},
+		{"bulk tag remove", "POST", "/v1/video/assets/bulk/tag", "", `{"workspace_id":"ws","asset_list":["one"],"add_tags":[],"remove_tags":["promo"]}`, "", "", []string{"video", "asset", "bulk-tag", "--workspace-id", "ws", "--asset-ids", "one", "--remove-tags", "promo"}, 204},
+		{"bulk delete", "DELETE", "/v1/video/assets/bulk/delete", "", `{"workspace_id":"ws","asset_list":["one","two"]}`, "", "", []string{"video", "asset", "bulk-delete", "--workspace-id", "ws", "--asset-ids", "one,two"}, 204},
+		{"playlist reorder move", "POST", "/v1/video/playlists/pl/reorder", "", `{"asset_id":"one","asset_position":0,"page_number":2,"page_size":20}`, `{"ok":true}`, `{"ok":true}`, []string{"video", "playlist", "reorder", "--playlist-id", "pl", "--asset-id", "one", "--asset-position", "0", "--page-number", "2", "--page-size", "20"}, 200},
+		{"playlist reorder sort", "POST", "/v1/video/playlists/pl/reorder", "", `{"sort_by":"created_at","sort_order":"desc"}`, `{"ok":true}`, `{"ok":true}`, []string{"video", "playlist", "reorder", "--playlist-id", "pl", "--sort-by", "created_at", "--sort-order", "desc"}, 200},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var requests atomic.Int32
@@ -113,12 +153,14 @@ func TestSDKRequests(t *testing.T) {
 				if got := r.Header.Get("X-Unexpected"); got != "" {
 					t.Errorf("unexpected header from SDK environment: %q", got)
 				}
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					t.Error(err)
+				}
 				if tc.body != "" {
-					body, err := io.ReadAll(r.Body)
-					if err != nil {
-						t.Error(err)
-					}
 					checkJSON(t, body, tc.body)
+				} else if len(body) != 0 {
+					t.Errorf("unexpected request body: %s", body)
 				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tc.status)
@@ -187,6 +229,108 @@ func TestSourceConfigInput(t *testing.T) {
 	}
 }
 
+func TestAssetUpdateJSONInput(t *testing.T) {
+	const metadata = `{"internal_id":9007199254740993}`
+	const actions = `[{"text":"Learn more","start_time":0,"position_from_right":"12"}]`
+	dir := t.TempDir()
+	metaPath, actionsPath := filepath.Join(dir, "metadata.json"), filepath.Join(dir, "actions.json")
+	for path, data := range map[string]string{metaPath: metadata, actionsPath: actions} {
+		if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tc := range []struct{ metaPath, actionsPath, input, wantActions string }{
+		{"-", actionsPath, metadata, actions},
+		{metaPath, "-", "[]", "[]"},
+	} {
+		var requests atomic.Int32
+		api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			requests.Add(1)
+			var body map[string]json.RawMessage
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Error(err)
+			}
+			var gotMetadata string
+			if err := json.Unmarshal(body["metadata"], &gotMetadata); err != nil || gotMetadata != metadata {
+				t.Errorf("metadata = %q, err = %v", gotMetadata, err)
+			}
+			checkJSON(t, body["call_to_actions"], tc.wantActions)
+			w.WriteHeader(http.StatusNoContent)
+		}))
+		out, _, err := runCLI(t, api.URL, tc.input, "video", "asset", "update", "--asset-id", "one",
+			"--metadata-file", tc.metaPath, "--call-to-actions-file", tc.actionsPath)
+		api.Close()
+		if err != nil || out != "" || requests.Load() != 1 {
+			t.Fatalf("stdout = %q, err = %v, requests = %d", out, err, requests.Load())
+		}
+	}
+}
+
+func TestChannelViewerInviteInput(t *testing.T) {
+	const users = `[{"email":"one@example.com","name":"One"},{"email":"two@example.com","name":"Two"}]`
+	path := filepath.Join(t.TempDir(), "viewers.json")
+	if err := os.WriteFile(path, []byte(users), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var requests atomic.Int32
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		if r.Method != "POST" || r.URL.Path != "/v1/channel/ws/viewers/invite" || r.Header.Get("Authorization") != "Bearer test-key" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL)
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Error(err)
+		}
+		checkJSON(t, body, `{"users":`+users+`}`)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"success":true}`)
+	}))
+	defer api.Close()
+	for _, filename := range []string{path, "-"} {
+		out, stderr, err := runCLI(t, api.URL, users, "video", "channel", "viewer", "invite",
+			"--workspace-id", "ws", "--viewers-file", filename)
+		if err != nil || stderr != "" {
+			t.Fatalf("invite failed: %v (%s)", err, stderr)
+		}
+		checkJSON(t, []byte(out), `{"success":true}`)
+	}
+	if got := requests.Load(); got != 2 {
+		t.Errorf("request count = %d; want 2", got)
+	}
+}
+
+func TestLiveCredentialOutput(t *testing.T) {
+	const secret = "fake-stream-key"
+	const signed = "https://example.com/upload?signature=fake-signed-url"
+	for _, tc := range []struct {
+		name, response, want string
+		args                 []string
+		status               int
+	}{
+		{"status table", `{"live_asset_id":"la","status":"active","stream_key":"` + secret + `","stream_url":"rtmps://example.com/` + secret + `"}`, "active", []string{"get", "--live-asset-id", "la"}, 200},
+		{"list table", `{"all_live_assets":[{"live_asset_id":"la","status":"active","stream_key":"` + secret + `","updated_at":{"unexpected":"` + secret + `"}}]}`, "active", []string{"list", "--live-workspace-id", "lw"}, 200},
+		{"thumbnail table", `{"presigned_upload_urls":{"end":"` + signed + `"},"message":"` + signed + `"}`, "Use --output json", []string{"thumbnail-upload-urls", "--live-asset-id", "la", "--statuses", "end"}, 200},
+		{"live failure", `{"message":"` + secret + ` ` + signed + `"}`, "HTTP 403", []string{"get", "--live-asset-id", "la"}, 403},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tc.status)
+				_, _ = io.WriteString(w, tc.response)
+			}))
+			defer api.Close()
+			args := append([]string{"video", "live", "asset", "--output", "table"}, tc.args...)
+			out, stderr, err := runCLI(t, api.URL, "", args...)
+			got := out + stderr + fmt.Sprint(err)
+			if (err != nil) != (tc.status >= 400) || !strings.Contains(got, tc.want) ||
+				strings.Contains(got, secret) || strings.Contains(got, "fake-signed-url") {
+				t.Fatalf("unexpected live command output: %q", got)
+			}
+		})
+	}
+}
+
 func TestValidationBeforeClientCreation(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "missing.mp4")
 	for _, tc := range []struct {
@@ -197,8 +341,40 @@ func TestValidationBeforeClientCreation(t *testing.T) {
 		{[]string{"video", "asset", "list", "--workspace-id", "ws", "--page-size", "101"}, "between 1 and 100"},
 		{[]string{"video", "asset", "list", "--workspace-id", "ws", "--next-page-token", "token", "--title", "test"}, "no title filter"},
 		{[]string{"video", "workspace", "list", "-o", "csv"}, "invalid --output"},
+		{[]string{"image", "purge", "--subdomain", "legacy"}, "unknown flag: --subdomain"},
+		{[]string{"image", "purge", "--source-id", "src"}, "urls"},
+		{[]string{"image", "purge", "--source-id", "src", "--urls="}, "at least one image path"},
+		{[]string{"image", "purge", "--source-id", "src", "--urls", "/photo.jpg?width=100"}, "without a query"},
+		{[]string{"image", "purge", "--source-id", "src", "--urls", "https://example.com/photo.jpg"}, "must be an image path"},
+		{[]string{"video", "channel", "viewer", "list", "--workspace-id", "ws", "--page-size", "101"}, "between 1 and 100"},
+		{[]string{"video", "channel", "viewer", "list", "--workspace-id", "ws", "--page-number", "2", "--next-page-token", "next"}, "page-number"},
+		{[]string{"video", "channel", "viewer", "invite", "--workspace-id", "ws", "--viewers-file", "-"}, "JSON array"},
+		{[]string{"video", "channel", "viewer", "remove", "--workspace-id", "ws", "--emails", "invalid"}, "bare email address"},
+		{[]string{"video", "live", "workspace", "update", "--live-workspace-id", "lw"}, "at least one"},
+		{[]string{"video", "live", "asset", "create", "--live-workspace-id", "lw", "--resolution", "4k"}, "--resolution"},
+		{[]string{"video", "live", "asset", "create", "--live-workspace-id", "lw", "--resolution", "720p", "--orientation", "invalid"}, "--orientation"},
+		{[]string{"video", "live", "asset", "update", "--live-asset-id", "la", "--start-at", "not-a-date"}, "RFC 3339"},
+		{[]string{"video", "live", "asset", "list", "--live-workspace-id", "lw", "--status", "unknown"}, "--status accepts only"},
+		{[]string{"video", "live", "asset", "list", "--live-workspace-id", "lw", "--page-number", "0"}, "at least 1"},
+		{[]string{"video", "live", "asset", "thumbnail-upload-urls", "--live-asset-id", "la", "--statuses", "complete"}, "--statuses accepts only"},
 		{[]string{"image", "source", "add", "--namespace", "test", "--type", "amazon", "--config", "null"}, "valid JSON object"},
 		{[]string{"image", "source", "update", "--source-id", "src", "--config", "{}"}, "type"},
+		{[]string{"video", "workspace", "folder", "list"}, "workspace-id"},
+		{[]string{"video", "workspace", "folder", "list", "--workspace-id", "ws", "-o", "csv"}, "invalid --output"},
+		{[]string{"video", "workspace", "folder", "update", "--workspace-id", "ws", "--folder-id", "f", "--root"}, "specify --name or --asset-ids"},
+		{[]string{"video", "workspace", "folder", "update", "--workspace-id", "ws", "--folder-id", "f", "--asset-ids", "one", "--root"}, "--root requires --name"},
+		{[]string{"video", "workspace", "folder", "update", "--workspace-id", "ws", "--folder-id", "f", "--name", "Clips", "--root", "--parent-id", "p"}, "cannot be combined"},
+		{[]string{"video", "workspace", "folder", "remove-assets", "--workspace-id", "ws", "--asset-ids", "one,,two"}, "empty IDs"},
+		{[]string{"video", "asset", "update", "--asset-id", "one"}, "at least one"},
+		{[]string{"video", "asset", "update", "--asset-id", "one", "--metadata-file", "-", "--call-to-actions-file", "-"}, "cannot both read stdin"},
+		{[]string{"video", "asset", "update", "--asset-id", "one", "--metadata-file", "-"}, "valid JSON object"},
+		{[]string{"video", "asset", "list-recoverable", "--workspace-id", "ws", "--page-size", "101"}, "between 1 and 100"},
+		{[]string{"video", "asset", "bulk-delete", "--workspace-id", "ws", "--asset-ids="}, "at least one asset ID"},
+		{[]string{"video", "asset", "bulk-tag", "--workspace-id", "ws", "--asset-ids", "one"}, "at least one tag"},
+		{[]string{"video", "playlist", "reorder", "--playlist-id", "pl", "--sort-by", "title"}, "sort-order"},
+		{[]string{"video", "playlist", "reorder", "--playlist-id", "pl", "--sort-by", "title", "--sort-order", "asc", "--asset-id", "one"}, "asset-id"},
+		{[]string{"video", "playlist", "reorder", "--playlist-id", "pl", "--asset-id", "one", "--page-number", "1", "--page-size", "20", "--asset-position", "20"}, "--asset-position"},
+		{[]string{"video", "playlist", "reorder", "--playlist-id", "pl", "--sort-by", "status", "--sort-order", "asc"}, "invalid --sort-by"},
 	} {
 		root := cmd.NewRootCommand(cmd.Options{NewClient: func() (*client.Client, error) {
 			t.Fatal("created API client for invalid input")
@@ -206,6 +382,7 @@ func TestValidationBeforeClientCreation(t *testing.T) {
 		}})
 		root.SetOut(io.Discard)
 		root.SetErr(io.Discard)
+		root.SetIn(strings.NewReader(""))
 		root.SetArgs(tc.args)
 		if err := root.Execute(); err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Errorf("%v: got %v, want %q", tc.args, err, tc.want)

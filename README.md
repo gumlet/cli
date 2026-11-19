@@ -92,6 +92,69 @@ or `created_at` sort and no `--title` filter. An empty token means there is no
 next page. Use `--folder-id ID` to filter by folder or `--folder-id=` for
 unfiled assets.
 
+### Organize, update, and recover videos
+
+```sh
+gumlet video workspace folder create --workspace-id WORKSPACE_ID --name "Clips"
+gumlet video workspace folder list --workspace-id WORKSPACE_ID -o table
+gumlet video workspace folder update --workspace-id WORKSPACE_ID \
+  --folder-id FOLDER_ID --asset-ids ASSET_ID
+gumlet video asset update --asset-id ASSET_ID --title "New title" \
+  --metadata-file ./metadata.json
+gumlet video asset bulk-tag --workspace-id WORKSPACE_ID \
+  --asset-ids ASSET_ID_1,ASSET_ID_2 --add-tags featured
+gumlet video asset list-recoverable --workspace-id WORKSPACE_ID -o table
+gumlet video asset recover --asset-id DELETED_ASSET_ID
+gumlet video playlist reorder --playlist-id PLAYLIST_ID --sort-by title --sort-order asc
+```
+
+`asset update` changes only the supplied fields. Metadata must be a JSON object;
+`--call-to-actions-file` takes a JSON array of objects. Either file flag accepts
+`-` to read from stdin. Use `video workspace folder remove-assets` to unfile
+assets without deleting them. `video asset bulk-delete` deletes the explicitly
+listed assets; double-check the workspace and IDs before running it.
+
+To move one asset in a playlist instead of sorting the whole playlist, supply
+`--asset-id`, `--page-number`, `--page-size`, and `--asset-position` together.
+Page numbers start at 1; positions within a page start at 0.
+
+### Manage channel viewers
+
+```sh
+gumlet video channel viewer list --workspace-id WORKSPACE_ID --page-size 25
+gumlet video channel viewer invite --workspace-id WORKSPACE_ID --viewers-file ./viewers.json
+gumlet video channel viewer remove --workspace-id WORKSPACE_ID --emails viewer@example.com
+```
+
+The invite file is a JSON array such as
+`[{"email":"viewer@example.com","name":"Example Viewer"}]`. Use `--viewers-file -`
+to read it from stdin. List viewers by page number or pass the previous JSON
+response's `next_page_token` as `--next-page-token`.
+
+### Manage live streams
+
+```sh
+gumlet video live workspace create --name "Studio"
+gumlet video live asset create --live-workspace-id LIVE_WORKSPACE_ID \
+  --resolution 720p --title "Live demo"
+gumlet video live asset start --live-asset-id LIVE_ASSET_ID
+gumlet video live asset get --live-asset-id LIVE_ASSET_ID -o table
+gumlet video live asset complete --live-asset-id LIVE_ASSET_ID
+```
+
+Live JSON responses can contain stream keys, ingest URLs, or presigned upload
+URLs. Keep them out of shared logs; live table output omits those fields.
+`video live asset thumbnail-upload-urls` returns upload URLs for the requested
+thumbnail states in JSON but does not upload files.
+
+### Inspect your account and invoices
+
+```sh
+gumlet user get
+gumlet billing invoice history
+gumlet billing invoice upcoming
+```
+
 ### Manage image sources and cache
 
 When a provider needs credentials, put its JSON configuration in a private
@@ -104,11 +167,13 @@ gumlet image source add --namespace mycompany --type amazon \
 gumlet image source update --source-id SOURCE_ID --type amazon \
   --config-file - < ./source-config.json
 
-gumlet image purge --subdomain mycompany --urls "/photo.jpg,/banner.png"
+gumlet image purge --source-id SOURCE_ID --urls "/photo.jpg,/banner.png"
 ```
 
-Supply paths or URLs without query parameters for a targeted purge. Omitting
-`--urls` purges the entire subdomain cache.
+Image purge now requires `--source-id` instead of `--subdomain`. Get the ID
+from `gumlet image source list -o table`. Supply explicit image paths without
+query strings or fragments; purging an entire source by omitting `--urls`
+is no longer supported.
 
 ## Output and scripting
 
@@ -139,7 +204,8 @@ or `--channel-visibility=false` for playlist updates.
 ## AI agent skills
 
 The repository includes skills for workspaces, assets, uploads, playlists,
-image sources, and cache purges. Browse them in [skills](./skills) or on
+live streams, channel viewers, account details and invoices, image sources,
+and cache purges. Browse them in [skills](./skills) or on
 [skills.sh](https://skills.sh/gumlet/cli). For example:
 
 ```sh

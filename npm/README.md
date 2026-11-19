@@ -1,0 +1,45 @@
+# Gumlet CLI
+
+Manage [Gumlet](https://www.gumlet.com) from your terminal. Upload videos,
+organize assets and playlists, manage live streams, and purge cached images.
+Commands return JSON by default for scripting; use `-o table` for readable output.
+
+## Install
+
+**npm — macOS, Linux, and Windows**
+
+```sh
+npm install -g @gumlet/cli
+```
+
+Requires Node.js 14.14 or later. The installer downloads and verifies the
+matching binary from GitHub Releases. macOS and Linux support x86-64 and
+ARM64; Windows supports x86-64.
+
+**Homebrew — macOS**
+
+```sh
+brew install --cask gumlet/tap/gumlet
+```
+
+**Manual download — no Node.js required**
+
+Download the archive for your OS and architecture from
+[GitHub Releases](https://github.com/gumlet/cli/releases). Verify its SHA-256
+digest against `checksums.txt`, extract it, and put `gumlet` (or `gumlet.exe`
+on Windows) on your `PATH`.
+
+## Get started
+
+Create an API key in the [Gumlet dashboard](https://dash.gumlet.com/developer/api-keys),
+then paste it when `gumlet login` prompts you:
+
+```sh
+gumlet --version
+gumlet login
+gumlet video workspace list -o table
+gumlet --help
+```
+
+For more examples and configuration details, read the
+[full README in the Gumlet CLI GitHub repository](https://github.com/gumlet/cli#readme).

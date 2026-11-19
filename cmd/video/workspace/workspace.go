@@ -11,6 +11,6 @@ func NewCommand(newClient client.Factory) *cobra.Command {
 		Use:   "workspace",
 		Short: "Manage video workspaces",
 	}
-	cmd.AddCommand(newCreateCommand(newClient), newDeleteCommand(newClient), newGetCommand(newClient), newListCommand(newClient), newUpdateCommand(newClient))
+	cmd.AddCommand(newCreateCommand(newClient), newDeleteCommand(newClient), newGetCommand(newClient), newListCommand(newClient), newUpdateCommand(newClient), newFolderCommand(newClient))
 	return cmd
 }
