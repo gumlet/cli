@@ -143,7 +143,8 @@ test("packs, installs and invokes the npm shim offline", async () => {
   const npm = (args, options) => exec(process.execPath, [process.env.npm_execpath, ...args], { cwd: pkg, ...options });
   const { stdout } = await npm(["pack", "--offline", "--ignore-scripts", "--json", "--pack-destination", root]);
   const [packed] = JSON.parse(stdout);
-  assert.deepEqual(packed.files.map(({ path }) => path).sort(), ["gumlet", "install.js", "npm-shrinkwrap.json", "package.json"]);
+  // npm includes the package README even though it isn't listed in "files".
+  assert.deepEqual(packed.files.map(({ path }) => path).sort(), ["README.md", "gumlet", "install.js", "npm-shrinkwrap.json", "package.json"]);
 
   // A consumer lock reuses the dependency tarballs cached by npm ci, with
   // no fetching of registry metadata or release assets during the smoke test.
