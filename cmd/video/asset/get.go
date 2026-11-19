@@ -8,30 +8,29 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var getCmd = &cobra.Command{
-	Use:   "get",
-	Short: "Get details of a video asset",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		assetID, _ := cmd.Flags().GetString("asset-id")
-		output, _ := cmd.Root().PersistentFlags().GetString("output")
+func newGetCommand(newClient client.Factory) *cobra.Command {
+	getCmd := &cobra.Command{
+		Use:   "get",
+		Short: "Get details of a video asset",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			assetID, _ := cmd.Flags().GetString("asset-id")
 
-		apiClient, err := client.NewClient()
-		if err != nil {
-			return err
-		}
+			apiClient, err := newClient()
+			if err != nil {
+				return err
+			}
 
-		var resp []byte
-		_, err = apiClient.VideoAssets.GetDetails(cmd.Context(), assetID, option.WithResponseBodyInto(&resp))
-		if err != nil {
-			return err
-		}
+			var resp []byte
+			_, err = apiClient.VideoAssets.GetDetails(cmd.Context(), assetID, option.WithResponseBodyInto(&resp))
+			if err != nil {
+				return err
+			}
 
-		return printer.Print(resp, output, "asset_id", "input.title", "output.playback_url", "output.thumbnail_url", "status", "created_at", "updated_at", "tag", "collection_id")
-	},
-}
-
-func init() {
-	Cmd.AddCommand(getCmd)
+			return printer.Print(cmd, resp, printer.Table{Columns: []string{"asset_id", "input.title", "output.playback_url", "output.thumbnail_url", "status", "created_at", "updated_at", "tag", "workspace_id"}})
+		},
+	}
 	getCmd.Flags().String("asset-id", "", "ID of the asset")
 	getCmd.MarkFlagRequired("asset-id")
+	return getCmd
 }

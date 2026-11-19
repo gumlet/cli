@@ -1,16 +1,16 @@
 package workspace
 
 import (
-	"gumlet/cmd/video"
+	"gumlet/pkg/client"
 
 	"github.com/spf13/cobra"
 )
 
-var Cmd = &cobra.Command{
-	Use:   "workspace",
-	Short: "Manage video workspaces",
-}
-
-func init() {
-	video.Cmd.AddCommand(Cmd)
+func NewCommand(newClient client.Factory) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "workspace",
+		Short: "Manage video workspaces",
+	}
+	cmd.AddCommand(newCreateCommand(newClient), newDeleteCommand(newClient), newGetCommand(newClient), newListCommand(newClient), newUpdateCommand(newClient))
+	return cmd
 }

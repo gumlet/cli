@@ -1,318 +1,172 @@
 # Gumlet CLI
 
-Command-line interface for managing [Gumlet](https://www.gumlet.com) video and image assets.
+Manage [Gumlet](https://www.gumlet.com) video workspaces, assets, playlists, image sources, and cache purges from your terminal.
 
----
+## Get started
 
-## Installation
+### 1. Install
 
-### Homebrew (macOS / Linux)
+**Homebrew** (macOS):
 
 ```sh
 brew install --cask gumlet/tap/gumlet
 ```
 
-### npm (macOS / Linux / Windows)
+**npm** (macOS, Linux, Windows):
 
 ```sh
 npm install -g @gumlet/cli
 ```
 
-### Direct download (macOS / Linux / Windows)
+The npm installer downloads and verifies the matching GitHub release archive.
+macOS and Linux support x86-64 and ARM64; Windows supports x86-64.
 
-Download the latest binary for your platform from the [GitHub Releases](https://github.com/gumlet/cli/releases) page.
+**Manual download:** Pick the archive for your OS and architecture from
+[GitHub Releases](https://github.com/gumlet/cli/releases). Compare its SHA-256
+digest with `checksums.txt`, extract it, and put `gumlet` (or `gumlet.exe`) on
+your `PATH`. Release archives label x86-64 as `x86_64` and ARM64 as `arm64`.
 
-| Platform | File |
-|---|---|
-| macOS (Apple Silicon) | `gumlet_darwin_arm64.tar.gz` |
-| macOS (Intel) | `gumlet_darwin_x86_64.tar.gz` |
-| Linux (x86_64) | `gumlet_linux_x86_64.tar.gz` |
-| Linux (ARM64) | `gumlet_linux_arm64.tar.gz` |
-| Windows (x86_64) | `gumlet_windows_x86_64.zip` |
+Check the installation with `gumlet --version`.
 
-Extract and move to a directory on your `PATH`:
+### 2. Create and save an API key
 
-```sh
-# macOS / Linux example
-tar -xzf gumlet_darwin_arm64.tar.gz
-sudo mv gumlet /usr/local/bin/
-```
-
-> **macOS Gatekeeper note:** If macOS blocks the binary with _"cannot be opened because the developer cannot be verified"_, remove the quarantine attribute:
-> ```sh
-> xattr -d com.apple.quarantine /usr/local/bin/gumlet
-> ```
-> Alternatively, open **System Settings → Privacy & Security** and click **Allow Anyway**. This is only needed for direct downloads — the Homebrew and npm installs handle this automatically.
-
----
-
-## Authentication
-
-Before using any command, log in with your Gumlet API key:
+Open [API Keys in the Gumlet dashboard](https://dash.gumlet.com/developer/api-keys),
+generate a key, and paste it into the hidden prompt:
 
 ```sh
 gumlet login
 ```
 
-You will be prompted to enter your API key securely. It is saved to `~/.gumlet.yaml`.
+The CLI saves the key to `~/.gumlet.yaml` (in your user profile on Windows).
+Login saves the key; the first API command verifies that it works. Rerun
+`gumlet login` to replace it, or use `gumlet logout` to remove the saved key.
 
-To remove saved credentials:
+For CI or other non-interactive sessions, inject `GUMLET_API_KEY` from your
+secret store. It takes precedence over the saved key and is not written to
+disk. `gumlet logout` does not unset it.
 
-```sh
-gumlet logout
-```
-
----
-
-## Global Flags
-
-| Flag | Default | Description |
-|---|---|---|
-| `--output` | `json` | Output format: `json` or `table` |
-
----
-
-## Commands
-
-### Video
-
-#### Workspaces
-
-| Command | Description |
-|---|---|
-| `gumlet video workspace list` | List all video workspaces |
-| `gumlet video workspace get --workspace-id <id>` | Get details of a workspace |
-| `gumlet video workspace create --name <name>` | Create a new workspace |
-| `gumlet video workspace update --workspace-id <id> --name <name>` | Rename a workspace |
-| `gumlet video workspace delete --workspace-id <id>` | Delete a workspace |
-
-**Examples:**
+### 3. Run your first command
 
 ```sh
-gumlet video workspace list --output table
-gumlet video workspace create --name "My Workspace"
-gumlet video workspace update --workspace-id ws_123 --name "Renamed"
-gumlet video workspace delete --workspace-id ws_123
+gumlet video workspace list -o table
+gumlet image source list -o table
 ```
 
----
+Find the workspace or source ID in the output. Run `gumlet --help` or append
+`--help` to any command for the full flag list.
 
-#### Assets
+## Common tasks
 
-| Command | Description |
-|---|---|
-| `gumlet video asset list --workspace-id <id>` | List assets in a workspace |
-| `gumlet video asset get --asset-id <id>` | Get details of an asset |
-| `gumlet video asset upload --file <path> --workspace-id <id>` | Upload a local video file |
-| `gumlet video asset delete --asset-id <id>` | Delete an asset |
+### Work with videos
 
-**`asset list` flags:**
-
-| Flag | Description |
-|---|---|
-| `--workspace-id` | *(required)* Workspace to list assets from |
-| `--status` | Filter by status (e.g. `ready`, `processing`) |
-| `--tag` | Filter by tag |
-| `--title` | Filter by title |
-| `--folder` | Filter by folder |
-| `--offset` | Pagination offset |
-| `--size` | Page size |
-| `--sort-by` | Field to sort by |
-| `--order-by` | Sort direction (`asc` / `desc`) |
-
-**`asset upload` flags:**
-
-| Flag | Description |
-|---|---|
-| `--file` | *(required)* Path to the local video file |
-| `--workspace-id` | *(required)* Workspace (collection) ID |
-| `--format` | Transcode format: `ABR` or `MP4` (default: `ABR`) |
-| `--title` | Asset title (defaults to filename if omitted) |
-| `--description` | Asset description |
-| `--profile-id` | Video profile ID |
-| `--playlist-id` | Add asset to this playlist after upload |
-| `--tag` | Comma-separated tags |
-
-**Examples:**
+Replace `WORKSPACE_ID`, `ASSET_ID`, and `PLAYLIST_ID` with the IDs from your account.
 
 ```sh
-gumlet video asset list --workspace-id ws_123 --output table
-gumlet video asset list --workspace-id ws_123 --status ready --size 20
-gumlet video asset get --asset-id asset_456
-gumlet video asset upload --file ./video.mp4 --workspace-id ws_123
-gumlet video asset upload --file ./video.mp4 --workspace-id ws_123 --title "My Video" --format MP4
-gumlet video asset delete --asset-id asset_456
+gumlet video asset list --workspace-id WORKSPACE_ID --status ready -o table
+gumlet video asset upload --workspace-id WORKSPACE_ID --file ./intro.mp4 \
+  --title "Introduction"
+gumlet video asset get --asset-id ASSET_ID -o table
+gumlet video playlist create --workspace-id WORKSPACE_ID --title "Getting started"
+gumlet video playlist add-asset --playlist-id PLAYLIST_ID --asset-ids ASSET_ID
+gumlet video playlist update --playlist-id PLAYLIST_ID --channel-visibility=false
 ```
 
----
+Upload accepts a nonempty local file. It defaults to `ABR` output and uses the
+filename as the title unless overridden. A successful upload returns
+`{"asset_id":"…","uploaded":true}`. It confirms file transfer, not completed
+transcoding; use `asset get` to check processing status.
 
-#### Playlists
-
-| Command | Description |
-|---|---|
-| `gumlet video playlist list --workspace-id <id>` | List all playlists in a workspace |
-| `gumlet video playlist create --workspace-id <id> --title <title>` | Create a new playlist |
-| `gumlet video playlist update --playlist-id <id>` | Update a playlist |
-| `gumlet video playlist get-assets --playlist-id <id>` | Get assets in a playlist |
-| `gumlet video playlist add-asset --playlist-id <id> --asset-ids <ids>` | Add assets to a playlist |
-| `gumlet video playlist remove-asset --playlist-id <id> --asset-ids <ids>` | Remove assets from a playlist |
-| `gumlet video playlist delete --playlist-id <id>` | Delete a playlist |
-
-**`playlist list` flags:**
-
-| Flag | Description |
-|---|---|
-| `--workspace-id` | *(required)* Workspace ID to list playlists for |
-
-**`playlist create` flags:**
-
-| Flag | Description |
-|---|---|
-| `--workspace-id` | *(required)* Workspace (collection) ID |
-| `--title` | *(required)* Playlist title |
-| `--description` | Playlist description |
-
-**`playlist update` flags:**
-
-| Flag | Description |
-|---|---|
-| `--playlist-id` | *(required)* Playlist ID |
-| `--title` | New title |
-| `--description` | New description |
-| `--channel-visibility` | Channel visibility setting |
-
-**`playlist add-asset` flags:**
-
-| Flag | Description |
-|---|---|
-| `--playlist-id` | *(required)* Playlist ID |
-| `--asset-ids` | *(required)* Comma-separated asset IDs |
-| `--positions` | Comma-separated positions for each asset (optional, must match `--asset-ids` count) |
-
-**Examples:**
+### Filter and paginate asset lists
 
 ```sh
-gumlet video playlist list --workspace-id ws_123 --output table
-gumlet video playlist create --workspace-id ws_123 --title "Best of 2026" --description "Top videos"
-gumlet video playlist update --playlist-id pl_789 --title "Renamed Playlist"
-gumlet video playlist add-asset --playlist-id pl_789 --asset-ids asset_1,asset_2
-gumlet video playlist add-asset --playlist-id pl_789 --asset-ids asset_1,asset_2 --positions 1,2
-gumlet video playlist remove-asset --playlist-id pl_789 --asset-ids asset_1
-gumlet video playlist get-assets --playlist-id pl_789 --output table
-gumlet video playlist delete --playlist-id pl_789
+gumlet video asset list --workspace-id WORKSPACE_ID \
+  --playlist-id PLAYLIST_ID --sort-by created_at --order-by desc --page-size 25
+
+gumlet video asset list --workspace-id WORKSPACE_ID --page-size 25 --page-number 2
 ```
 
----
+Page numbers start at 1, and page size is 1–100. For cursor pagination, pass
+the response's `next_page_token` as `--next-page-token` instead of `--page-number`,
+keeping the same filters and page size. Cursor pagination requires the default
+or `created_at` sort and no `--title` filter. An empty token means there is no
+next page. Use `--folder-id ID` to filter by folder or `--folder-id=` for
+unfiled assets.
 
-### Image
+### Manage image sources and cache
 
-#### Sources
-
-| Command | Description |
-|---|---|
-| `gumlet image source list` | List all image sources |
-| `gumlet image source get --source-id <id>` | Get details of an image source |
-| `gumlet image source add --namespace <ns> --type <type>` | Create a new image source |
-| `gumlet image source update --source-id <id>` | Update an image source |
-| `gumlet image source delete --source-id <id>` | Delete an image source |
-
-**`source add` / `update` flags:**
-
-| Flag | Description |
-|---|---|
-| `--namespace` | *(add only, required)* Subdomain for the source (e.g. `mycompany`) |
-| `--type` | Source type: `amazon`, `proxy`, `gcs`, `dostorage`, `wasabi`, `cloudinary`, `azure`, `linode`, `backblaze`, `cloudflare` |
-| `--source-id` | *(update only, required)* ID of the source to update |
-| `--config` | JSON config for the source type (see examples below) |
-
-**Examples:**
+When a provider needs credentials, put its JSON configuration in a private
+file or stream it from stdin. Avoid including secrets in `--config` or
+committing them to your repository.
 
 ```sh
-gumlet image source list --output table
-gumlet image source get --source-id src_123
+gumlet image source add --namespace mycompany --type amazon \
+  --config-file ./source-config.json
+gumlet image source update --source-id SOURCE_ID --type amazon \
+  --config-file - < ./source-config.json
 
-# Amazon S3
-gumlet image source add \
-  --namespace mycompany \
-  --type amazon \
-  --config '{"bucket_name":"my-bucket","bucket_region":"us-east-1","access_key":"KEY","secret":"SECRET"}'
-
-# Web proxy
-gumlet image source add \
-  --namespace mycompany \
-  --type proxy \
-  --config '{"whitelisted_domains":["example.com"]}'
-
-gumlet image source update --source-id src_123 --type amazon --config '{"bucket_name":"new-bucket"}'
-gumlet image source delete --source-id src_123
+gumlet image purge --subdomain mycompany --urls "/photo.jpg,/banner.png"
 ```
 
----
+Supply paths or URLs without query parameters for a targeted purge. Omitting
+`--urls` purges the entire subdomain cache.
 
-#### Purge Cache
+## Output and scripting
+
+API commands default to `--output json`. JSON preserves the API's field names,
+nested values, and pagination metadata; an empty response writes nothing.
+Choose `-o table` for a terminal view, and `--no-color` to disable styling.
+Upload progress and command errors go to stderr. Failures exit nonzero.
+
+For scripts migrating from older versions: read nested JSON fields instead of
+flattened labels, use `--page-size` and `--page-number` or `--next-page-token`
+instead of `--size` / `--offset`, and use `--folder-id` instead of `--folder`.
+The asset list no longer accepts `--type`. Use `--channel-visibility=true`
+or `--channel-visibility=false` for playlist updates.
+
+## Troubleshooting
+
+- **`gumlet` not found:** Make sure the install location is on your `PATH`.
+  For npm, check the global npm prefix with `npm prefix -g`.
+- **Missing key or HTTP 401/403:** Check whether `GUMLET_API_KEY` is set and
+  overriding your saved key. Generate a new key if needed and confirm it has
+  access to the workspace or source.
+- **Upload failed after creating an asset:** The error includes its asset ID.
+  Check the asset before retrying; a new upload command may create another one.
+- **npm installation failed:** Confirm your Node.js version meets the package's
+  `engines` requirement, your platform is supported, and the machine can reach
+  GitHub Releases. You can also install the release binary manually.
+
+## AI agent skills
+
+The repository includes skills for workspaces, assets, uploads, playlists,
+image sources, and cache purges. Browse them in [skills](./skills) or on
+[skills.sh](https://skills.sh/gumlet/cli). For example:
 
 ```sh
-gumlet image purge --subdomain <subdomain> [--urls <url1,url2>]
+npx skills add https://github.com/gumlet/cli --skill gumlet-video-asset
 ```
 
-| Flag | Description |
-|---|---|
-| `--subdomain` | *(required)* Subdomain to purge cache for |
-| `--urls` | Comma-separated list of specific paths/URLs to purge (omit to purge all) |
+## Development
 
-**Examples:**
+Use the Go version in [go.mod](go.mod):
 
 ```sh
-gumlet image purge --subdomain mycompany
-gumlet image purge --subdomain mycompany --urls "https://mycompany.gumlet.io/photo.jpg,https://mycompany.gumlet.io/banner.png"
+go run . --help
+go test ./...
+go vet ./...
 ```
 
----
+The integration tests use local mock servers; no Gumlet API key is required.
 
-## Output Formats
-
-All commands support `--output json` (default) and `--output table`:
+To test the npm installer, use Node.js 26 (the CI version) and the same Go
+toolchain. The smoke tests pack and install the package using local release
+fixtures:
 
 ```sh
-gumlet video workspace list --output table
-gumlet video asset list --workspace-id ws_123 --output table
-gumlet image source list --output table
+npm --prefix npm ci --ignore-scripts
+npm --prefix npm test
 ```
-
----
-
-## AI Agent Skills
-
-Gumlet CLI ships with [skills.sh](https://skills.sh) skill definitions so AI agents (Claude, Windsurf, Cursor, etc.) can discover and invoke CLI commands automatically.
-
-### Install a skill
-
-```sh
-npx skills add https://github.com/gumlet/cli -skill gumlet-video-asset
-```
-
-Available skills:
-
-| Skill | Description |
-|---|---|
-| `gumlet-video-workspace` | List, create, update, and delete video workspaces |
-| `gumlet-video-asset` | List, get, and delete video assets |
-| `gumlet-video-asset-upload` | Upload a local video file to Gumlet |
-| `gumlet-video-playlist` | Manage playlists and their assets |
-| `gumlet-image-source` | Manage image sources (S3, GCS, proxy, etc.) |
-| `gumlet-image-purge` | Purge CDN cache for an image source |
-
-### Validate skills locally
-
-```sh
-npx skills-ref validate ./skills/gumlet-video-workspace
-npx skills-ref validate ./skills/gumlet-video-asset-upload
-```
-
-> Skills are published at [skills.sh/gumlet/cli](https://skills.sh/gumlet/cli).
-
----
 
 ## License
 
-Apache 2.0 © [Gumlet Pte. Ltd.](https://www.gumlet.com)
+[Apache 2.0](LICENSE) © [Gumlet Pte. Ltd.](https://www.gumlet.com)

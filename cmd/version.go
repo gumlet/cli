@@ -19,35 +19,20 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"gumlet/pkg/ui"
 )
 
-var (
-	buildVersion = "dev"
-	buildCommit  = "none"
-	buildDate    = "unknown"
-)
-
-// SetBuildInfo configures version metadata injected at build time via ldflags.
-func SetBuildInfo(version, commit, date string) {
-	buildVersion = version
-	buildCommit = commit
-	buildDate = date
-	RootCmd.Version = version
-	RootCmd.SetVersionTemplate(fmt.Sprintf("gumlet version %s\ncommit: %s\nbuilt: %s\n", version, commit, date))
+func versionText(version, commit, date string) string {
+	return fmt.Sprintf("gumlet version %s\ncommit: %s\nbuilt: %s\n", version, commit, date)
 }
 
-var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Print version information",
-	Args:  cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println()
-		ui.PrintVersionBox(buildVersion, buildCommit, buildDate)
-		return nil
-	},
-}
-
-func init() {
-	RootCmd.AddCommand(versionCmd)
+func newVersionCommand(version, commit, date string) *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Print version information",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			_, err := fmt.Fprint(cmd.OutOrStdout(), versionText(version, commit, date))
+			return err
+		},
+	}
 }

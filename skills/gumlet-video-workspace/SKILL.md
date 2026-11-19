@@ -36,5 +36,5 @@ gumlet video workspace delete --workspace-id <id>
 
 ## Notes
 
-- `--output table` renders results as a human-readable table; default output is JSON.
+- `-o table` shows a human-readable table. Default JSON includes the unmodified API fields and any pagination metadata in the response.
 - The `--workspace-id` flag is required for `get`, `update`, and `delete`.

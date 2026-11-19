@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   test:
-    name: Go checks
+    name: CLI checks
     permissions:
       contents: read
     uses: ./.github/workflows/test.yml

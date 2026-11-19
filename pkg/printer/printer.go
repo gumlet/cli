@@ -1,368 +1,180 @@
 package printer
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
+	"slices"
 	"strings"
+	"text/tabwriter"
+	"unicode"
 
-	"gumlet/pkg/ui"
+	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
-const (
-	maxCellWidth = 40
-	colGap       = "  "
-)
-
-// Print outputs data in the specified format ("json" or "table").
-// fields optionally limits which keys are shown; all keys shown if empty.
-func Print(data []byte, format string, fields ...string) error {
-	switch format {
-	case "table":
-		return printTable(data, fields)
-	default:
-		return printJSON(data, fields)
-	}
+// Table describes the fields to display and, for a list envelope, its row key.
+// A top-level array needs no row key.
+type Table struct {
+	RowsKey string
+	Columns []string
 }
 
-func printJSON(data []byte, fields []string) error {
-	var v interface{}
-	if err := json.Unmarshal(data, &v); err != nil {
-		fmt.Println(string(data))
+func Print(cmd *cobra.Command, data []byte, table Table) error {
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 {
 		return nil
 	}
-	if len(fields) > 0 {
-		v = filterByFields(v, fields)
+	out := cmd.OutOrStdout()
+	format, _ := cmd.Flags().GetString("output")
+	if format == "json" {
+		var formatted bytes.Buffer
+		if err := json.Indent(&formatted, data, "", "  "); err != nil {
+			return errors.New("API returned an invalid JSON response")
+		}
+		formatted.WriteByte('\n')
+		_, err := formatted.WriteTo(out)
+		return err
 	}
-	out, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		fmt.Println(string(data))
-		return nil
-	}
-	fmt.Println(string(out))
-	return nil
+	return printTable(out, data, table, colorEnabled(cmd, out))
 }
 
-// filterByFields filters a decoded JSON value to only the requested field paths,
-// flattening dot-notation paths to their label (last segment).
-func filterByFields(v interface{}, fields []string) interface{} {
-	switch val := v.(type) {
-	case map[string]interface{}:
-		out := make(map[string]interface{}, len(fields))
-		for _, f := range fields {
-			extracted := extractField(val, f)
-			if extracted != nil {
-				out[fieldLabel(f)] = extracted
-			}
-		}
-		if len(out) == 0 {
-			for k, child := range val {
-				val[k] = filterByFields(child, fields)
-			}
-			return val
-		}
-		return out
-	case []interface{}:
-		for i, item := range val {
-			val[i] = filterByFields(item, fields)
-		}
-		return val
+func printTable(out io.Writer, data []byte, table Table, color bool) error {
+	var value any
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if !json.Valid(data) || decoder.Decode(&value) != nil {
+		return errors.New("API returned an invalid JSON response")
 	}
-	return v
-}
-
-func printTable(data []byte, fields []string) error {
-	var raw interface{}
-	if err := json.Unmarshal(data, &raw); err != nil {
-		fmt.Println(string(data))
-		return nil
-	}
-
-	switch v := raw.(type) {
-	case []interface{}:
-		return renderSlice(v, fields, 0, false, "result", "results")
-	case map[string]interface{}:
-		if len(fields) > 0 {
-			for _, f := range fields {
-				if extractField(v, f) != nil {
-					return renderKeyValue(v, fields)
-				}
+	if table.RowsKey != "" {
+		if envelope, ok := value.(map[string]any); ok {
+			rows, exists := envelope[table.RowsKey]
+			if !exists {
+				return fmt.Errorf("API response did not include %q rows; use -o json to inspect it", table.RowsKey)
+			}
+			if rows == nil {
+				value = []any{}
+			} else if array, ok := rows.([]any); ok {
+				value = array
+			} else {
+				return fmt.Errorf("API response field %q is not an array", table.RowsKey)
 			}
 		}
-		total, hasTotal := extractTotalCount(v)
-		singular, plural := itemLabels(v)
-		var best []interface{}
-		bestScore := -1
-		for _, val := range v {
-			arr, ok := val.([]interface{})
-			if !ok || len(arr) == 0 {
+	}
+	var formatted bytes.Buffer
+	writer := tabwriter.NewWriter(&formatted, 0, 4, 2, ' ', 0)
+	hasHeader := false
+	switch v := value.(type) {
+	case []any:
+		if len(v) == 0 {
+			_, err := fmt.Fprintln(out, "No results found.")
+			return err
+		}
+		columns := table.Columns
+		if len(columns) == 0 {
+			if row, ok := v[0].(map[string]any); ok {
+				columns = keys(row)
+			}
+		}
+		if len(columns) > 0 {
+			hasHeader = true
+			labels := make([]string, len(columns))
+			for i, name := range columns {
+				labels[i] = heading(name)
+			}
+			_, _ = fmt.Fprintln(writer, strings.Join(labels, "\t"))
+		}
+		for _, row := range v {
+			if len(columns) == 0 {
+				_, _ = fmt.Fprintln(writer, cell(row))
 				continue
 			}
-			score := 0
-			if len(fields) > 0 {
-				if firstObj, ok := arr[0].(map[string]interface{}); ok {
-					for _, f := range fields {
-						if extractField(firstObj, f) != nil {
-							score++
-						}
-					}
-				}
+			values := make([]string, len(columns))
+			for i, column := range columns {
+				values[i] = cell(field(row, column))
 			}
-			if score > bestScore || (score == bestScore && len(arr) > len(best)) {
-				best = arr
-				bestScore = score
-			}
+			_, _ = fmt.Fprintln(writer, strings.Join(values, "\t"))
 		}
-		if best != nil {
-			return renderSlice(best, fields, total, hasTotal, singular, plural)
+	case map[string]any:
+		columns := table.Columns
+		if len(columns) == 0 {
+			columns = keys(v)
 		}
-		return renderKeyValue(v, fields)
+		for _, column := range columns {
+			_, _ = fmt.Fprintf(writer, "%s\t%s\n", heading(column), cell(field(v, column)))
+		}
 	default:
-		fmt.Println(string(data))
+		_, _ = fmt.Fprintln(writer, cell(v))
 	}
-	return nil
+	if err := writer.Flush(); err != nil {
+		return err
+	}
+	if color && hasHeader {
+		// Style the header after layout so ANSI codes don't affect column widths.
+		header, rows, _ := bytes.Cut(formatted.Bytes(), []byte("\n"))
+		_, err := fmt.Fprintf(out, "\x1b[1m%s\x1b[0m\n%s", header, rows)
+		return err
+	}
+	_, err := formatted.WriteTo(out)
+	return err
 }
 
-func renderSlice(rows []interface{}, fields []string, total int, hasTotal bool, singular, plural string) error {
-	if len(rows) == 0 {
-		fmt.Println(ui.EmptyState())
-		return nil
+func keys(value map[string]any) []string {
+	out := make([]string, 0, len(value))
+	for key := range value {
+		out = append(out, key)
 	}
+	slices.Sort(out)
+	return out
+}
 
-	firstObj, ok := rows[0].(map[string]interface{})
-	if !ok {
-		for _, r := range rows {
-			fmt.Println(r)
-		}
-		return nil
-	}
-
-	headers := resolveFields(firstObj, fields)
-	headerLabels := make([]string, len(headers))
-	for i, h := range headers {
-		headerLabels[i] = humanHeader(fieldLabel(h))
-	}
-
-	plainRows := make([][]string, 0, len(rows))
-	for _, row := range rows {
-		obj, ok := row.(map[string]interface{})
+func field(value any, path string) any {
+	for part := range strings.SplitSeq(path, ".") {
+		object, ok := value.(map[string]any)
 		if !ok {
-			continue
+			return nil
 		}
-		cells := make([]string, len(headers))
-		for i, h := range headers {
-			cells[i] = plainCell(extractField(obj, h))
-		}
-		plainRows = append(plainRows, cells)
+		value = object[part]
 	}
-
-	widths := columnWidths(headerLabels, plainRows)
-	printTableRow(styleHeaders(headerLabels, widths))
-	printTableRow(styleSeparators(widths))
-	for _, cells := range plainRows {
-		printTableRow(styleCells(headers, cells, widths))
-	}
-
-	fmt.Println()
-	if hasTotal {
-		fmt.Println(ui.PageLabel(len(plainRows), total, singular, plural))
-	} else {
-		fmt.Println(ui.CountLabel(len(plainRows), singular, plural))
-	}
-	return nil
+	return value
 }
 
-func extractTotalCount(obj map[string]interface{}) (int, bool) {
-	for _, key := range []string{"total_asset_count", "total_count", "total"} {
-		if n, ok := intFromJSON(obj[key]); ok {
-			return n, true
-		}
-	}
-	return 0, false
+func heading(path string) string {
+	path = path[strings.LastIndex(path, ".")+1:]
+	return strings.ToUpper(clean(strings.ReplaceAll(path, "_", " ")))
 }
 
-func itemLabels(obj map[string]interface{}) (string, string) {
-	if _, ok := obj["total_asset_count"]; ok {
-		return "asset", "assets"
-	}
-	return "result", "results"
-}
-
-func intFromJSON(v interface{}) (int, bool) {
-	switch n := v.(type) {
-	case float64:
-		return int(n), true
-	case int:
-		return n, true
-	case int64:
-		return int(n), true
-	}
-	return 0, false
-}
-
-func renderKeyValue(obj map[string]interface{}, fields []string) error {
-	keys := resolveFields(obj, fields)
-	labels := make([]string, len(keys))
-	values := make([]string, len(keys))
-	for i, k := range keys {
-		labels[i] = humanHeader(fieldLabel(k))
-		values[i] = plainCell(extractField(obj, k))
-	}
-
-	labelWidth := maxLen(labels)
-	for i, label := range labels {
-		paddedLabel := ui.PadRight(label, labelWidth)
-		styledLabel := ui.Cyan(os.Stdout, paddedLabel)
-		plainValue := values[i]
-		if plainValue == "" {
-			plainValue = "—"
-		}
-		styledValue := ui.StyleCell(fieldLabel(keys[i]), plainValue)
-		fmt.Println(styledLabel + colGap + styledValue)
-	}
-	return nil
-}
-
-func plainCell(v interface{}) string {
-	raw := cellString(v)
-	if raw == "" {
+func cell(value any) string {
+	if value == nil || value == "" {
 		return "—"
 	}
-	return truncate(raw, maxCellWidth)
-}
-
-func columnWidths(headers []string, rows [][]string) []int {
-	widths := make([]int, len(headers))
-	for i, h := range headers {
-		widths[i] = len(h)
-	}
-	for _, row := range rows {
-		for i, cell := range row {
-			if len(cell) > widths[i] {
-				widths[i] = len(cell)
-			}
-		}
-	}
-	return widths
-}
-
-func maxLen(items []string) int {
-	max := 0
-	for _, s := range items {
-		if len(s) > max {
-			max = len(s)
-		}
-	}
-	return max
-}
-
-func printTableRow(cells []string) {
-	fmt.Println(strings.Join(cells, colGap))
-}
-
-// styleHeaders returns bold, width-padded header cells.
-func styleHeaders(labels []string, widths []int) []string {
-	out := make([]string, len(labels))
-	for i, label := range labels {
-		out[i] = ui.Bold(os.Stdout, ui.PadRight(label, widths[i]))
-	}
-	return out
-}
-
-func styleSeparators(widths []int) []string {
-	out := make([]string, len(widths))
-	for i, w := range widths {
-		sep := strings.Repeat("─", w)
-		out[i] = ui.Dim(os.Stdout, sep)
-	}
-	return out
-}
-
-func styleCells(headers []string, cells []string, widths []int) []string {
-	out := make([]string, len(cells))
-	for i, cell := range cells {
-		padded := ui.PadRight(cell, widths[i])
-		out[i] = ui.StyleCell(fieldLabel(headers[i]), padded)
-	}
-	return out
-}
-
-func humanHeader(s string) string {
-	s = strings.ReplaceAll(s, "_", " ")
-	if s == "" {
-		return s
-	}
-	return strings.ToUpper(s[:1]) + s[1:]
-}
-
-// resolveFields returns the display fields: the provided list if non-empty,
-// otherwise all top-level keys from the object.
-func resolveFields(obj map[string]interface{}, fields []string) []string {
-	if len(fields) > 0 {
-		return fields
-	}
-	keys := make([]string, 0, len(obj))
-	for k := range obj {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
-// extractField retrieves a value from obj using a dot-notation path (e.g. "input.title").
-func extractField(obj map[string]interface{}, path string) interface{} {
-	parts := strings.SplitN(path, ".", 2)
-	val, ok := obj[parts[0]]
+	text, ok := value.(string)
 	if !ok {
-		return nil
+		encoded, _ := json.Marshal(value)
+		text = string(encoded)
 	}
-	if len(parts) == 1 {
-		return val
+	runes := []rune(clean(text))
+	if len(runes) > 50 {
+		return string(runes[:49]) + "…"
 	}
-	nested, ok := val.(map[string]interface{})
-	if !ok {
-		return nil
-	}
-	return extractField(nested, parts[1])
+	return string(runes)
 }
 
-// fieldLabel returns the last segment of a dot-notation path as the column header.
-func fieldLabel(path string) string {
-	parts := strings.Split(path, ".")
-	return parts[len(parts)-1]
+func clean(text string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, text)
 }
 
-// cellString converts a value to a display string, rendering nested objects as compact JSON.
-func cellString(v interface{}) string {
-	if v == nil {
-		return ""
-	}
-	switch val := v.(type) {
-	case string:
-		return val
-	case bool:
-		if val {
-			return "true"
-		}
-		return "false"
-	case float64:
-		if val == float64(int64(val)) {
-			return fmt.Sprintf("%d", int64(val))
-		}
-		return fmt.Sprintf("%g", val)
-	case map[string]interface{}, []interface{}:
-		b, err := json.Marshal(val)
-		if err != nil {
-			return fmt.Sprintf("%v", val)
-		}
-		return string(b)
-	default:
-		return fmt.Sprintf("%v", val)
-	}
-}
-
-func truncate(s string, max int) string {
-	if len(s) <= max {
-		return s
-	}
-	return s[:max-1] + "…"
+func colorEnabled(cmd *cobra.Command, out io.Writer) bool {
+	disabled, _ := cmd.Flags().GetBool("no-color")
+	_, noColor := os.LookupEnv("NO_COLOR")
+	file, ok := out.(*os.File)
+	return !disabled && !noColor && ok && term.IsTerminal(int(file.Fd()))
 }

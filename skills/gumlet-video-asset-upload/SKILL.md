@@ -5,7 +5,7 @@ description: "Upload a local video file to Gumlet as a new video asset using the
 
 ## Basic upload
 
-Title defaults to the filename when `--title` is not provided.
+Use a nonempty local file. Title defaults to the filename when `--title` is not provided.
 
 ```sh
 gumlet video asset upload --file ./video.mp4 --workspace-id <id>
@@ -41,13 +41,17 @@ gumlet video asset upload \
 | `--format` | ❌ | `ABR` (HLS + DASH) or `MP4`. Default: `ABR` |
 | `--title` | ❌ | Asset title. Defaults to filename |
 | `--description` | ❌ | Asset description |
+| `--profile-id` | ❌ | Video profile ID |
 | `--playlist-id` | ❌ | Add asset to this playlist after upload |
 | `--tag` | ❌ | Comma-separated tags |
 
 ## After upload
 
-Check processing status with:
+Successful upload returns `{"asset_id":"…","uploaded":true}` by default.
+Progress goes to stderr. File transfer is separate from transcoding; check processing status with:
 
 ```sh
 gumlet video asset get --asset-id <returned_asset_id>
 ```
+
+If file transfer fails after the asset is created, the error includes its ID. Check that asset before starting a new upload.

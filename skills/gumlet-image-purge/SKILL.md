@@ -13,7 +13,7 @@ gumlet image purge --subdomain mycompany
 
 ```sh
 gumlet image purge --subdomain mycompany \
-  --urls "https://mycompany.gumlet.io/photo.jpg,https://mycompany.gumlet.io/banner.png"
+  --urls "/photo.jpg,/banner.png"
 ```
 
 ## Flags
@@ -21,7 +21,7 @@ gumlet image purge --subdomain mycompany \
 | Flag | Required | Description |
 |---|---|---|
 | `--subdomain` | ✅ | Subdomain to purge cache for (e.g. `mycompany` for `mycompany.gumlet.io`) |
-| `--urls` | ✅ | Comma-separated list of specific URLs to purge |
+| `--urls` | No | Comma-separated paths or URLs without query parameters. Omit to purge the entire cache. |
 
 ## Notes
 

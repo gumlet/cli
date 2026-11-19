@@ -20,12 +20,18 @@
   },
   "files": [
     "gumlet",
-    "install.js"
+    "install.js",
+    "npm-shrinkwrap.json"
   ],
   "scripts": {
-    "postinstall": "node install.js"
+    "postinstall": "node install.js",
+    "test": "node --test test/install.test.js"
+  },
+  "dependencies": {
+    "tar-stream": "3.2.2",
+    "yauzl": "3.4.0"
   },
   "engines": {
-    "node": ">=14"
+    "node": ">=14.14"
   }
 }

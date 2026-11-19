@@ -2,14 +2,17 @@ package video
 
 import (
 	"github.com/spf13/cobra"
-	cmd "gumlet/cmd"
+	"gumlet/cmd/video/asset"
+	"gumlet/cmd/video/playlist"
+	"gumlet/cmd/video/workspace"
+	"gumlet/pkg/client"
 )
 
-var Cmd = &cobra.Command{
-	Use:   "video",
-	Short: "Manage video resources",
-}
-
-func init() {
-	cmd.RootCmd.AddCommand(Cmd)
+func NewCommand(newClient client.Factory) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "video",
+		Short: "Manage video resources",
+	}
+	cmd.AddCommand(asset.NewCommand(newClient), playlist.NewCommand(newClient), workspace.NewCommand(newClient))
+	return cmd
 }

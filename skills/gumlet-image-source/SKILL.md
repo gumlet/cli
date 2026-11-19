@@ -18,13 +18,16 @@ gumlet image source get --source-id <id>
 
 ## Create a new image source
 
+Keep any provider credentials in a private JSON file or pipe them from a
+secret store. Don't place them in command arguments or commit them.
+
 ### Amazon S3
 
 ```sh
 gumlet image source add \
   --namespace mycompany \
   --type amazon \
-  --config '{"bucket_name":"my-bucket","bucket_region":"us-east-1","access_key":"KEY","secret":"SECRET"}'
+  --config-file ./amazon-source.json
 ```
 
 ### Web proxy
@@ -42,7 +45,7 @@ gumlet image source add \
 gumlet image source add \
   --namespace mycompany \
   --type gcs \
-  --config '{"bucket_name":"my-gcs-bucket","service_account_json":"{...}"}'
+  --config-file ./gcs-source.json
 ```
 
 ### DigitalOcean Spaces
@@ -51,13 +54,13 @@ gumlet image source add \
 gumlet image source add \
   --namespace mycompany \
   --type dostorage \
-  --config '{"bucket_name":"my-space","bucket_region":"nyc3","access_key":"KEY","secret":"SECRET"}'
+  --config-file ./spaces-source.json
 ```
 
 ## Update an existing source
 
 ```sh
-gumlet image source update --source-id <id> --type amazon --config '{"bucket_name":"new-bucket"}'
+gumlet image source update --source-id <id> --type amazon --config-file - < ./amazon-source.json
 ```
 
 ## Delete a source
@@ -71,11 +74,12 @@ gumlet image source delete --source-id <id>
 | Flag | Required | Description |
 |---|---|---|
 | `--namespace` | ✅ (add only) | Subdomain (e.g. `mycompany` → `mycompany.gumlet.io`) |
-| `--type` | ✅ (add) | Source type: `amazon`, `proxy`, `gcs`, `dostorage`, `wasabi`, `cloudinary`, `azure`, `linode`, `backblaze`, `cloudflare` |
-| `--config` | ❌ | JSON string with type-specific storage configuration |
+| `--type` | ✅ (add/update) | Source type: `amazon`, `proxy`, `gcs`, `dostorage`, `wasabi`, `cloudinary`, `azure`, `linode`, `backblaze`, `cloudflare` |
+| `--config-file` | ❌ | Read a provider JSON object from a file or `-` for stdin |
+| `--config` | ❌ | Inline provider JSON object; use only for nonsensitive values |
 | `--source-id` | ✅ (get/update/delete) | ID of the source |
 
 ## Notes
 
 - Use `--output table` for a human-readable view.
-- The `--config` JSON structure varies by source type.
+- Provider JSON fields vary by source type. Use only one of `--config-file` and `--config`.

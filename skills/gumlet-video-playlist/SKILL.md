@@ -19,12 +19,13 @@ gumlet video playlist create --workspace-id <id> --title "Best of 2026" --descri
 
 ## Update a playlist
 
-All flags are optional — only supplied flags are updated.
+Supply `--playlist-id` and at least one field to update. Only supplied fields change.
 
 ```sh
 gumlet video playlist update --playlist-id <id> --title "Renamed Playlist"
 gumlet video playlist update --playlist-id <id> --description "Updated description"
-gumlet video playlist update --playlist-id <id> --channel-visibility public
+gumlet video playlist update --playlist-id <id> --channel-visibility=true
+gumlet video playlist update --playlist-id <id> --channel-visibility=false
 ```
 
 ## Get assets in a playlist

@@ -9,27 +9,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all video workspaces",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		output, _ := cmd.Root().PersistentFlags().GetString("output")
+func newListCommand(newClient client.Factory) *cobra.Command {
+	listCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List all video workspaces",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
 
-		apiClient, err := client.NewClient()
-		if err != nil {
-			return err
-		}
+			apiClient, err := newClient()
+			if err != nil {
+				return err
+			}
 
-		var resp []byte
-		_, err = apiClient.VideoWorkspaces.List(cmd.Context(), sdk.VideoWorkspaceListParams{}, option.WithResponseBodyInto(&resp))
-		if err != nil {
-			return err
-		}
+			var resp []byte
+			_, err = apiClient.VideoWorkspaces.List(cmd.Context(), sdk.VideoWorkspaceListParams{}, option.WithResponseBodyInto(&resp))
+			if err != nil {
+				return err
+			}
 
-		return printer.Print(resp, output, "id", "name", "type", "created_at")
-	},
-}
-
-func init() {
-	Cmd.AddCommand(listCmd)
+			return printer.Print(cmd, resp, printer.Table{RowsKey: "all_sources", Columns: []string{"id", "name", "type", "created_at"}})
+		},
+	}
+	return listCmd
 }

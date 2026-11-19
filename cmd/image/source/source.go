@@ -1,16 +1,16 @@
 package source
 
 import (
-	"gumlet/cmd/image"
+	"gumlet/pkg/client"
 
 	"github.com/spf13/cobra"
 )
 
-var Cmd = &cobra.Command{
-	Use:   "source",
-	Short: "Manage image sources",
-}
-
-func init() {
-	image.Cmd.AddCommand(Cmd)
+func NewCommand(newClient client.Factory) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "source",
+		Short: "Manage image sources",
+	}
+	cmd.AddCommand(newAddCommand(newClient), newDeleteCommand(newClient), newGetCommand(newClient), newListCommand(newClient), newUpdateCommand(newClient))
+	return cmd
 }

@@ -9,36 +9,31 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all playlists",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		output, _ := cmd.Root().PersistentFlags().GetString("output")
+func newListCommand(newClient client.Factory) *cobra.Command {
+	listCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List all playlists",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
 
-		apiClient, err := client.NewClient()
-		if err != nil {
-			return err
-		}
+			apiClient, err := newClient()
+			if err != nil {
+				return err
+			}
 
-		collectionID, _ := cmd.Flags().GetString("workspace-id")
+			workspaceID, _ := cmd.Flags().GetString("workspace-id")
+			params := sdk.VideoPlaylistListAllParams{WorkspaceID: sdk.String(workspaceID)}
 
-		params := sdk.VideoPlaylistListAllParams{}
-		if collectionID != "" {
-			params.CollectionID = sdk.String(collectionID)
-		}
+			var resp []byte
+			_, err = apiClient.VideoPlaylists.ListAll(cmd.Context(), params, option.WithResponseBodyInto(&resp))
+			if err != nil {
+				return err
+			}
 
-		var resp []byte
-		_, err = apiClient.VideoPlaylists.ListAll(cmd.Context(), params, option.WithResponseBodyInto(&resp))
-		if err != nil {
-			return err
-		}
-
-		return printer.Print(resp, output, "id", "collection_id", "title", "description")
-	},
-}
-
-func init() {
-	Cmd.AddCommand(listCmd)
+			return printer.Print(cmd, resp, printer.Table{Columns: []string{"id", "workspace_id", "title", "description"}})
+		},
+	}
 	listCmd.Flags().String("workspace-id", "", "Workspace ID to list playlists for")
 	listCmd.MarkFlagRequired("workspace-id")
+	return listCmd
 }

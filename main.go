@@ -16,11 +16,10 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"gumlet/cmd"
-	_ "gumlet/cmd/image/source"
-	_ "gumlet/cmd/video/asset"
-	_ "gumlet/cmd/video/playlist"
-	_ "gumlet/cmd/video/workspace"
 )
 
 var (
@@ -30,6 +29,9 @@ var (
 )
 
 func main() {
-	cmd.SetBuildInfo(version, commit, date)
-	cmd.Execute()
+	root := cmd.NewRootCommand(cmd.Options{Version: version, Commit: commit, Date: date})
+	if err := root.Execute(); err != nil {
+		fmt.Fprintln(root.ErrOrStderr(), "Error:", err)
+		os.Exit(1)
+	}
 }
