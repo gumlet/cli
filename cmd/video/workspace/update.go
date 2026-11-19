@@ -1,11 +1,11 @@
 package workspace
 
 import (
-	"fmt"
-
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
+	sdk "github.com/gumlet/golang-sdk"
+	"github.com/gumlet/golang-sdk/option"
 	"github.com/spf13/cobra"
 )
 
@@ -17,17 +17,13 @@ var updateCmd = &cobra.Command{
 		name, _ := cmd.Flags().GetString("name")
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
-		body := map[string]interface{}{
-			"name": name,
-		}
-
 		apiClient, err := client.NewClient()
 		if err != nil {
 			return err
 		}
 
-		path := fmt.Sprintf("/video/workspaces/%s", workspaceID)
-		resp, err := apiClient.Post(path, body)
+		var resp []byte
+		_, err = apiClient.VideoWorkspaces.Update(cmd.Context(), workspaceID, sdk.VideoWorkspaceUpdateParams{Name: sdk.String(name)}, option.WithResponseBodyInto(&resp))
 		if err != nil {
 			return err
 		}

@@ -1,13 +1,12 @@
 package asset
 
 import (
-	"fmt"
-
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
+	sdk "github.com/gumlet/golang-sdk"
+	"github.com/gumlet/golang-sdk/option"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 var listCmd = &cobra.Command{
@@ -22,16 +21,16 @@ var listCmd = &cobra.Command{
 			return err
 		}
 
-		path := fmt.Sprintf("/video/assets/list/%s", workspaceID)
-
-		queryParams := make(map[string]string)
-		cmd.Flags().Visit(func(f *pflag.Flag) {
-			if f.Name != "workspace-id" {
-				queryParams[f.Name] = f.Value.String()
+		var resp []byte
+		opts := []option.RequestOption{option.WithResponseBodyInto(&resp)}
+		// Preserve the existing list filters and their query keys during the SDK migration.
+		for _, filter := range []string{"status", "tag", "title", "folder", "offset", "size", "playlist-id", "sort-by", "order-by", "type"} {
+			if value, _ := cmd.Flags().GetString(filter); value != "" {
+				opts = append(opts, option.WithQuery(filter, value))
 			}
-		})
+		}
 
-		resp, err := apiClient.Get(path, queryParams)
+		_, err = apiClient.VideoAssets.List(cmd.Context(), workspaceID, sdk.VideoAssetListParams{}, opts...)
 		if err != nil {
 			return err
 		}

@@ -1,25 +1,27 @@
 package client
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
 	"io"
 	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"gumlet/pkg/ui"
 
+	sdk "github.com/gumlet/golang-sdk"
+	"github.com/gumlet/golang-sdk/option"
 	"github.com/spf13/viper"
 )
 
-const baseURL = "https://api.gumlet.com/v1"
-
 type Client struct {
-	apiKey     string
-	httpClient *http.Client
+	ImageSources    *sdk.ImageSourceService
+	VideoAssets     *sdk.VideoAssetService
+	VideoPlaylists  *sdk.VideoPlaylistService
+	VideoWorkspaces *sdk.VideoWorkspaceService
 }
 
 func NewClient() (*Client, error) {
@@ -27,102 +29,21 @@ func NewClient() (*Client, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("API key is not set — run 'gumlet login' to get started")
 	}
+	opts := []option.RequestOption{
+		option.WithEnvironmentProduction(),
+		option.WithAPIKey(apiKey),
+		option.WithRequestTimeout(30 * time.Second),
+		// Keep the previous one-attempt behavior, especially for asset creation.
+		option.WithMaxRetries(0),
+	}
+	// Construct the SDK services explicitly so inherited SDK environment
+	// variables can't redirect a saved CLI credential or inject headers.
 	return &Client{
-		apiKey:     apiKey,
-		httpClient: &http.Client{},
+		ImageSources:    sdk.NewImageSourceService(opts...),
+		VideoAssets:     sdk.NewVideoAssetService(opts...),
+		VideoPlaylists:  sdk.NewVideoPlaylistService(opts...),
+		VideoWorkspaces: sdk.NewVideoWorkspaceService(opts...),
 	}, nil
-}
-
-func (c *Client) newRequest(method, path string, body interface{}) (*http.Request, error) {
-	url := baseURL + path
-	var buf *bytes.Buffer
-	if body != nil {
-		b, err := json.Marshal(body)
-		if err != nil {
-			return nil, err
-		}
-		buf = bytes.NewBuffer(b)
-	} else {
-		buf = bytes.NewBuffer(nil)
-	}
-
-	req, err := http.NewRequest(method, url, buf)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
-
-	return req, nil
-}
-
-func (c *Client) Do(req *http.Request) ([]byte, error) {
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("API error: %s", string(body))
-	}
-
-	return body, nil
-}
-
-func (c *Client) Get(path string, queryParams map[string]string) ([]byte, error) {
-	req, err := c.newRequest("GET", path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	q := req.URL.Query()
-	for k, v := range queryParams {
-		if v != "" {
-			q.Add(k, v)
-		}
-	}
-	req.URL.RawQuery = q.Encode()
-
-	return c.Do(req)
-}
-
-func (c *Client) Post(path string, body interface{}) ([]byte, error) {
-	req, err := c.newRequest("POST", path, body)
-	if err != nil {
-		return nil, err
-	}
-	return c.Do(req)
-}
-
-func (c *Client) Delete(path string) ([]byte, error) {
-	req, err := c.newRequest("DELETE", path, nil)
-	if err != nil {
-		return nil, err
-	}
-	return c.Do(req)
-}
-
-func (c *Client) DeleteWithBody(path string, body interface{}) ([]byte, error) {
-	req, err := c.newRequest("DELETE", path, body)
-	if err != nil {
-		return nil, err
-	}
-	return c.Do(req)
-}
-
-func (c *Client) Put(path string, body interface{}) ([]byte, error) {
-	req, err := c.newRequest("PUT", path, body)
-	if err != nil {
-		return nil, err
-	}
-	return c.Do(req)
 }
 
 type progressReader struct {
@@ -144,7 +65,7 @@ func (p *progressReader) Read(buf []byte) (int, error) {
 
 // PutFile streams a local file to a pre-signed URL (e.g. S3) using a plain PUT.
 // No Gumlet auth header is added — the URL is self-authorising.
-func (c *Client) PutFile(uploadURL, filePath string) error {
+func PutFile(ctx context.Context, uploadURL, filePath string) error {
 	f, err := os.Open(filePath)
 	if err != nil {
 		return fmt.Errorf("cannot open file: %w", err)
@@ -162,14 +83,14 @@ func (c *Client) PutFile(uploadURL, filePath string) error {
 	}
 
 	pr := &progressReader{r: f, total: info.Size()}
-	req, err := http.NewRequest("PUT", uploadURL, pr)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, pr)
 	if err != nil {
 		return err
 	}
 	req.ContentLength = info.Size()
 	req.Header.Set("Content-Type", contentType)
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	ui.FinishProgress()
 	if err != nil {
 		return err

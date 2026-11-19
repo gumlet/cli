@@ -1,11 +1,11 @@
 package playlist
 
 import (
-	"fmt"
-
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
+	sdk "github.com/gumlet/golang-sdk"
+	"github.com/gumlet/golang-sdk/option"
 	"github.com/spf13/cobra"
 )
 
@@ -17,17 +17,13 @@ var removeAssetCmd = &cobra.Command{
 		assetIDs, _ := cmd.Flags().GetStringSlice("asset-ids")
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
-		body := map[string]interface{}{
-			"delete_list": assetIDs,
-		}
-
 		apiClient, err := client.NewClient()
 		if err != nil {
 			return err
 		}
 
-		path := fmt.Sprintf("/video/playlist/%s/asset", playlistID)
-		resp, err := apiClient.DeleteWithBody(path, body)
+		var resp []byte
+		_, err = apiClient.VideoPlaylists.DeleteAsset(cmd.Context(), playlistID, sdk.VideoPlaylistDeleteAssetParams{DeleteList: sdk.F(assetIDs)}, option.WithResponseBodyInto(&resp))
 		if err != nil {
 			return err
 		}

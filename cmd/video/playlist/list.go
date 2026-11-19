@@ -4,6 +4,8 @@ import (
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
+	sdk "github.com/gumlet/golang-sdk"
+	"github.com/gumlet/golang-sdk/option"
 	"github.com/spf13/cobra"
 )
 
@@ -20,7 +22,13 @@ var listCmd = &cobra.Command{
 
 		collectionID, _ := cmd.Flags().GetString("workspace-id")
 
-		resp, err := apiClient.Get("/video/playlist", map[string]string{"collection_id": collectionID})
+		params := sdk.VideoPlaylistListAllParams{}
+		if collectionID != "" {
+			params.CollectionID = sdk.String(collectionID)
+		}
+
+		var resp []byte
+		_, err = apiClient.VideoPlaylists.ListAll(cmd.Context(), params, option.WithResponseBodyInto(&resp))
 		if err != nil {
 			return err
 		}

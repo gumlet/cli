@@ -4,6 +4,8 @@ import (
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
+	sdk "github.com/gumlet/golang-sdk"
+	"github.com/gumlet/golang-sdk/option"
 	"github.com/spf13/cobra"
 )
 
@@ -18,7 +20,8 @@ var listCmd = &cobra.Command{
 			return err
 		}
 
-		resp, err := apiClient.Get("/image/sources", nil)
+		var resp []byte
+		_, err = apiClient.ImageSources.List(cmd.Context(), sdk.ImageSourceListParams{}, option.WithResponseBodyInto(&resp))
 		if err != nil {
 			return err
 		}

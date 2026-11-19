@@ -7,6 +7,8 @@ import (
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
+	sdk "github.com/gumlet/golang-sdk"
+	"github.com/gumlet/golang-sdk/option"
 	"github.com/spf13/cobra"
 )
 
@@ -32,14 +34,20 @@ var updateCmd = &cobra.Command{
 				body[sourceType] = configObj
 			}
 		}
+		payload, err := json.Marshal(body)
+		if err != nil {
+			return err
+		}
 
 		apiClient, err := client.NewClient()
 		if err != nil {
 			return err
 		}
 
-		path := fmt.Sprintf("/image/sources/%s", sourceID)
-		resp, err := apiClient.Post(path, body)
+		var resp []byte
+		_, err = apiClient.ImageSources.Update(cmd.Context(), sourceID, sdk.ImageSourceUpdateParams{},
+			// Keep the CLI's dynamic provider config, including legacy provider keys.
+			option.WithRequestBody("application/json", payload), option.WithResponseBodyInto(&resp))
 		if err != nil {
 			return err
 		}

@@ -4,6 +4,8 @@ import (
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
+	sdk "github.com/gumlet/golang-sdk"
+	"github.com/gumlet/golang-sdk/option"
 	"github.com/spf13/cobra"
 )
 
@@ -14,16 +16,13 @@ var createCmd = &cobra.Command{
 		name, _ := cmd.Flags().GetString("name")
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
-		body := map[string]interface{}{
-			"name": name,
-		}
-
 		apiClient, err := client.NewClient()
 		if err != nil {
 			return err
 		}
 
-		resp, err := apiClient.Post("/video/workspaces", body)
+		var resp []byte
+		_, err = apiClient.VideoWorkspaces.New(cmd.Context(), sdk.VideoWorkspaceNewParams{Name: sdk.String(name)}, option.WithResponseBodyInto(&resp))
 		if err != nil {
 			return err
 		}

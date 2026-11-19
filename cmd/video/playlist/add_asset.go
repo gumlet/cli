@@ -6,6 +6,8 @@ import (
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
+	sdk "github.com/gumlet/golang-sdk"
+	"github.com/gumlet/golang-sdk/option"
 	"github.com/spf13/cobra"
 )
 
@@ -25,17 +27,12 @@ var addAssetCmd = &cobra.Command{
 			return fmt.Errorf("--positions count (%d) must match --asset-ids count (%d)", len(positions), len(assetIDs))
 		}
 
-		assetList := make([]interface{}, len(assetIDs))
+		assetList := make([]sdk.VideoPlaylistNewAssetParamsAssetList, len(assetIDs))
 		for i, id := range assetIDs {
-			entry := map[string]interface{}{"asset_id": id}
+			assetList[i].AssetID = sdk.String(id)
 			if len(positions) > 0 {
-				entry["position"] = positions[i]
+				assetList[i].Position = sdk.Int(int64(positions[i]))
 			}
-			assetList[i] = entry
-		}
-
-		body := map[string]interface{}{
-			"asset_list": assetList,
 		}
 
 		apiClient, err := client.NewClient()
@@ -43,8 +40,8 @@ var addAssetCmd = &cobra.Command{
 			return err
 		}
 
-		path := fmt.Sprintf("/video/playlist/%s/asset", playlistID)
-		resp, err := apiClient.Post(path, body)
+		var resp []byte
+		_, err = apiClient.VideoPlaylists.NewAsset(cmd.Context(), playlistID, sdk.VideoPlaylistNewAssetParams{AssetList: sdk.F(assetList)}, option.WithResponseBodyInto(&resp))
 		if err != nil {
 			return err
 		}

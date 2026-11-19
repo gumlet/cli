@@ -1,13 +1,13 @@
 package asset
 
 import (
-	"encoding/json"
 	"fmt"
 	"path/filepath"
 
 	"gumlet/pkg/client"
 	"gumlet/pkg/ui"
 
+	sdk "github.com/gumlet/golang-sdk"
 	"github.com/spf13/cobra"
 )
 
@@ -19,32 +19,31 @@ var uploadCmd = &cobra.Command{
 		workspaceID, _ := cmd.Flags().GetString("workspace-id")
 		format, _ := cmd.Flags().GetString("format")
 
-		body := map[string]interface{}{
-			"collection_id": workspaceID,
-			"format":        format,
+		params := sdk.VideoAssetUploadParams{
+			CollectionID: sdk.String(workspaceID),
+			Format:       sdk.F(sdk.VideoAssetUploadParamsFormat(format)),
+			Title:        sdk.String(filepath.Base(filePath)),
 		}
 
 		if cmd.Flags().Changed("title") {
 			v, _ := cmd.Flags().GetString("title")
-			body["title"] = v
-		} else {
-			body["title"] = filepath.Base(filePath)
+			params.Title = sdk.String(v)
 		}
 		if cmd.Flags().Changed("description") {
 			v, _ := cmd.Flags().GetString("description")
-			body["description"] = v
+			params.Description = sdk.String(v)
 		}
 		if cmd.Flags().Changed("profile-id") {
 			v, _ := cmd.Flags().GetString("profile-id")
-			body["profile_id"] = v
+			params.ProfileID = sdk.String(v)
 		}
 		if cmd.Flags().Changed("playlist-id") {
 			v, _ := cmd.Flags().GetString("playlist-id")
-			body["playlist_id"] = v
+			params.PlaylistID = sdk.String(v)
 		}
 		if cmd.Flags().Changed("tag") {
 			v, _ := cmd.Flags().GetStringSlice("tag")
-			body["tag"] = v
+			params.Tag = sdk.F(v)
 		}
 
 		apiClient, err := client.NewClient()
@@ -53,25 +52,19 @@ var uploadCmd = &cobra.Command{
 		}
 
 		ui.Info("Creating upload session...")
-		resp, err := apiClient.Post("/video/assets/upload", body)
+		result, err := apiClient.VideoAssets.Upload(cmd.Context(), params)
 		if err != nil {
 			return err
 		}
 
-		var result map[string]interface{}
-		if err := json.Unmarshal(resp, &result); err != nil {
-			return fmt.Errorf("parsing response: %w", err)
-		}
-
-		uploadURL, ok := result["upload_url"].(string)
-		if !ok || uploadURL == "" {
+		if result == nil || result.UploadURL == "" {
 			return fmt.Errorf("upload_url not found in response")
 		}
 
-		assetID, _ := result["asset_id"].(string)
+		assetID := result.AssetID
 		ui.Success("Asset created: %s", assetID)
 
-		if err := apiClient.PutFile(uploadURL, filePath); err != nil {
+		if err := client.PutFile(cmd.Context(), result.UploadURL, filePath); err != nil {
 			return fmt.Errorf("upload failed: %w", err)
 		}
 

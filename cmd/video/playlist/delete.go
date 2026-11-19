@@ -6,6 +6,7 @@ import (
 
 	"gumlet/pkg/client"
 
+	"github.com/gumlet/golang-sdk/option"
 	"github.com/spf13/cobra"
 )
 
@@ -20,8 +21,8 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
-		path := fmt.Sprintf("/video/playlist/%s", playlistID)
-		resp, err := apiClient.Delete(path)
+		var resp []byte
+		err = apiClient.VideoPlaylists.Delete(cmd.Context(), playlistID, option.WithResponseBodyInto(&resp))
 		if err != nil {
 			return err
 		}

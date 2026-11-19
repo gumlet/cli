@@ -1,11 +1,11 @@
 package image
 
 import (
-	"fmt"
-
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
+	sdk "github.com/gumlet/golang-sdk"
+	"github.com/gumlet/golang-sdk/option"
 	"github.com/spf13/cobra"
 )
 
@@ -17,17 +17,13 @@ var purgeCmd = &cobra.Command{
 		urls, _ := cmd.Flags().GetStringSlice("urls")
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
-		body := map[string]interface{}{
-			"paths": urls,
-		}
-
 		apiClient, err := client.NewClient()
 		if err != nil {
 			return err
 		}
 
-		path := fmt.Sprintf("/purge/%s", subdomain)
-		resp, err := apiClient.Post(path, body)
+		var resp []byte
+		_, err = apiClient.ImageSources.PurgeCache(cmd.Context(), subdomain, sdk.ImageSourcePurgeCacheParams{Paths: sdk.F(urls)}, option.WithResponseBodyInto(&resp))
 		if err != nil {
 			return err
 		}

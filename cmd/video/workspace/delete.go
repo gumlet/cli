@@ -1,11 +1,10 @@
 package workspace
 
 import (
-	"fmt"
-
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
+	"github.com/gumlet/golang-sdk/option"
 	"github.com/spf13/cobra"
 )
 
@@ -21,8 +20,8 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
-		path := fmt.Sprintf("/video/workspaces/%s", workspaceID)
-		resp, err := apiClient.Delete(path)
+		var resp []byte
+		_, err = apiClient.VideoWorkspaces.Delete(cmd.Context(), workspaceID, option.WithResponseBodyInto(&resp))
 		if err != nil {
 			return err
 		}

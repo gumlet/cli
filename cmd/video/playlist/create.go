@@ -4,6 +4,8 @@ import (
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
+	sdk "github.com/gumlet/golang-sdk"
+	"github.com/gumlet/golang-sdk/option"
 	"github.com/spf13/cobra"
 )
 
@@ -16,18 +18,13 @@ var createCmd = &cobra.Command{
 		description, _ := cmd.Flags().GetString("description")
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
-		body := map[string]interface{}{
-			"collection_id": collectionID,
-			"title":         title,
-			"description":   description,
-		}
-
 		apiClient, err := client.NewClient()
 		if err != nil {
 			return err
 		}
 
-		resp, err := apiClient.Post("/video/playlist", body)
+		var resp []byte
+		_, err = apiClient.VideoPlaylists.New(cmd.Context(), sdk.VideoPlaylistNewParams{CollectionID: sdk.String(collectionID), Title: sdk.String(title), Description: sdk.String(description)}, option.WithResponseBodyInto(&resp))
 		if err != nil {
 			return err
 		}

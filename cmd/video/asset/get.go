@@ -1,11 +1,10 @@
 package asset
 
 import (
-	"fmt"
-
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
+	"github.com/gumlet/golang-sdk/option"
 	"github.com/spf13/cobra"
 )
 
@@ -21,8 +20,8 @@ var getCmd = &cobra.Command{
 			return err
 		}
 
-		path := fmt.Sprintf("/video/assets/%s", assetID)
-		resp, err := apiClient.Get(path, nil)
+		var resp []byte
+		_, err = apiClient.VideoAssets.GetDetails(cmd.Context(), assetID, option.WithResponseBodyInto(&resp))
 		if err != nil {
 			return err
 		}

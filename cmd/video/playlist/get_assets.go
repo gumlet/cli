@@ -1,11 +1,11 @@
 package playlist
 
 import (
-	"fmt"
-
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
+	sdk "github.com/gumlet/golang-sdk"
+	"github.com/gumlet/golang-sdk/option"
 	"github.com/spf13/cobra"
 )
 
@@ -21,8 +21,8 @@ var getAssetsCmd = &cobra.Command{
 			return err
 		}
 
-		path := fmt.Sprintf("/video/playlist/%s/assets", playlistID)
-		resp, err := apiClient.Get(path, nil)
+		var resp []byte
+		_, err = apiClient.VideoPlaylists.ListAssets(cmd.Context(), playlistID, sdk.VideoPlaylistListAssetsParams{}, option.WithResponseBodyInto(&resp))
 		if err != nil {
 			return err
 		}

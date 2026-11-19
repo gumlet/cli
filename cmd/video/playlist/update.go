@@ -1,11 +1,11 @@
 package playlist
 
 import (
-	"fmt"
-
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
+	sdk "github.com/gumlet/golang-sdk"
+	"github.com/gumlet/golang-sdk/option"
 	"github.com/spf13/cobra"
 )
 
@@ -16,18 +16,19 @@ var updateCmd = &cobra.Command{
 		playlistID, _ := cmd.Flags().GetString("playlist-id")
 		output, _ := cmd.Root().PersistentFlags().GetString("output")
 
-		body := map[string]interface{}{}
+		params := sdk.VideoPlaylistUpdateParams{}
 		if cmd.Flags().Changed("title") {
 			v, _ := cmd.Flags().GetString("title")
-			body["title"] = v
+			params.Title = sdk.String(v)
 		}
 		if cmd.Flags().Changed("description") {
 			v, _ := cmd.Flags().GetString("description")
-			body["description"] = v
+			params.Description = sdk.String(v)
 		}
 		if cmd.Flags().Changed("channel-visibility") {
 			v, _ := cmd.Flags().GetString("channel-visibility")
-			body["channel_visibility"] = v
+			// Preserve the CLI's documented string visibility values.
+			params.ChannelVisibility = sdk.Raw[bool](v)
 		}
 
 		apiClient, err := client.NewClient()
@@ -35,8 +36,8 @@ var updateCmd = &cobra.Command{
 			return err
 		}
 
-		path := fmt.Sprintf("/video/playlist/%s", playlistID)
-		resp, err := apiClient.Post(path, body)
+		var resp []byte
+		_, err = apiClient.VideoPlaylists.Update(cmd.Context(), playlistID, params, option.WithResponseBodyInto(&resp))
 		if err != nil {
 			return err
 		}

@@ -1,11 +1,10 @@
 package source
 
 import (
-	"fmt"
-
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
+	"github.com/gumlet/golang-sdk/option"
 	"github.com/spf13/cobra"
 )
 
@@ -21,8 +20,8 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
-		path := fmt.Sprintf("/image/sources/%s", sourceID)
-		resp, err := apiClient.Delete(path)
+		var resp []byte
+		_, err = apiClient.ImageSources.Delete(cmd.Context(), sourceID, option.WithResponseBodyInto(&resp))
 		if err != nil {
 			return err
 		}
