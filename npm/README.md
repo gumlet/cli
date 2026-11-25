@@ -44,5 +44,5 @@ For CI or non-interactive environments, create an API key in
 [Gumlet API Keys](https://dash.gumlet.com/developer/api-keys) and set the
 `GUMLET_API_KEY` environment variable instead.
 
-For the full command reference, examples, and configuration details, see
-[COMMANDS.md](https://github.com/gumlet/cli/blob/main/COMMANDS.md) in the Gumlet CLI GitHub repository.
+For more examples and configuration details, read the
+[full README in the Gumlet CLI GitHub repository](https://github.com/gumlet/cli#readme).
