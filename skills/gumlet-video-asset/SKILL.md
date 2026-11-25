@@ -1,7 +1,22 @@
 ---
 name: gumlet-video-asset
-description: Manage Gumlet video assets using the Gumlet CLI. Use this skill to list, inspect, update, delete, or recover assets, or to tag or delete assets in bulk. Requires the Gumlet CLI to be installed and authenticated via `gumlet login`.
+description: Manage Gumlet video assets using the Gumlet CLI. Use this skill to create assets from URLs, list, inspect, update, manage thumbnails, delete, or recover assets, or to tag or delete assets in bulk. Requires the Gumlet CLI to be installed and authenticated via `gumlet login`.
 ---
+
+## Create an asset from a URL
+
+```sh
+gumlet video asset create --workspace-id WORKSPACE_ID \
+  --input https://example.com/video.mp4 --title "Demo"
+gumlet video asset create --workspace-id WORKSPACE_ID \
+  --input https://example.com/video.mp4 --profile-id PROFILE_ID
+```
+
+Defaults to `--format ABR` unless `--profile-id` is set without `--format`.
+Optional flags include `--format` (`ABR` or `MP4`), `--title`, `--description`,
+`--profile-id`, `--playlist-id`, `--folder-id`, `--tag`, `--resolution`,
+`--mp4-access`, `--audio-only`, `--enable-drm`, and `--metadata-file` (JSON
+object file or `-` for stdin).
 
 ## List assets in a workspace
 
@@ -51,6 +66,19 @@ Only supplied fields are sent. The metadata file must contain a JSON object;
 the calls-to-action file must contain a JSON array of objects. Either flag
 supports `-` for stdin, but both cannot read stdin at once.
 
+## Manage thumbnails
+
+```sh
+# Upload a local image file as the thumbnail
+gumlet video asset thumbnail-upload --asset-id ASSET_ID --file ./thumb.png
+
+# Select a frame from the video (supports fractional seconds)
+gumlet video asset thumbnail-select --asset-id ASSET_ID --frame-at-second 2.5
+```
+
+`thumbnail-upload` requests a presigned URL and uploads the file automatically,
+returning `{"asset_id":"…","uploaded":true}` without printing the signed URL.
+
 ## Delete an asset
 
 ```sh
@@ -77,7 +105,7 @@ bulk deletion.
 
 ## Notes
 
-- `--workspace-id` is required for list and bulk commands.
-- `--asset-id` is required for `get`, `update`, `recover`, and `delete`.
+- `--workspace-id` is required for `create`, `list`, `list-recoverable`, and bulk commands.
+- `--asset-id` is required for `get`, `update`, `thumbnail-upload`, `thumbnail-select`, `recover`, and `delete`.
 - Use `--output table` for a human-readable view.
 - Cursor pagination requires the default or `created_at` sort and no title filter. Repeat the filters and page size when passing a cursor.
