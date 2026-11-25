@@ -16,12 +16,15 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"gumlet/cmd/image"
 	"gumlet/cmd/video"
 	"gumlet/pkg/client"
 	"gumlet/pkg/credentials"
+	"gumlet/pkg/oauth"
 
 	"github.com/spf13/cobra"
 )
@@ -29,18 +32,33 @@ import (
 type Options struct {
 	Version, Commit, Date string
 	Credentials           credentials.Store
+	OAuth                 oauth.Config
 	NewClient             client.Factory
 }
 
 func NewRootCommand(opts Options) *cobra.Command {
+	oauthCfg := opts.OAuth.WithDefaults()
 	newClient := opts.NewClient
 	if newClient == nil {
 		newClient = func() (*client.Client, error) {
-			key, err := opts.Credentials.APIKey()
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			token, err := opts.Credentials.BearerToken(ctx, func(ctx context.Context, refreshToken string) (credentials.Token, error) {
+				tok, err := oauthCfg.Refresh(ctx, refreshToken)
+				if err != nil {
+					return credentials.Token{}, err
+				}
+				return credentials.Token{
+					AccessToken:  tok.AccessToken,
+					RefreshToken: tok.RefreshToken,
+					TokenType:    tok.TokenType,
+					ExpiresAt:    tok.ExpiresAt,
+				}, nil
+			})
 			if err != nil {
 				return nil, err
 			}
-			return client.New(key, opts.Version), nil
+			return client.New(token, opts.Version), nil
 		}
 	}
 	var output string
@@ -50,10 +68,11 @@ func NewRootCommand(opts Options) *cobra.Command {
 		Long: `Gumlet CLI puts Gumlet's video and image APIs at your fingertips.
 
 Get started:
-  gumlet login                          Save your API key
+  gumlet login                          Sign in with your Gumlet account
   gumlet video workspace list -o table  Browse your workspaces
   gumlet video asset upload --help      Upload a video
 
+For CI or non-interactive environments, set GUMLET_API_KEY instead of running login.
 Use --output table for human-friendly tables, or --output json for scripts.`,
 		Version:       opts.Version,
 		SilenceUsage:  true,
@@ -68,7 +87,7 @@ Use --output table for human-friendly tables, or --output json for scripts.`,
 	root.PersistentFlags().StringVarP(&output, "output", "o", "json", "Output format: json or table")
 	root.PersistentFlags().Bool("no-color", false, "Disable colored output")
 	root.SetVersionTemplate(versionText(opts.Version, opts.Commit, opts.Date))
-	root.AddCommand(newLoginCommand(opts.Credentials), newLogoutCommand(opts.Credentials),
+	root.AddCommand(newLoginCommand(opts.Credentials, oauthCfg), newLogoutCommand(opts.Credentials, oauthCfg),
 		newVersionCommand(opts.Version, opts.Commit, opts.Date), image.NewCommand(newClient), video.NewCommand(newClient))
 	root.AddCommand(newUserCommand(newClient), newOrgCommand(newClient), newAuditLogCommand(newClient), newBillingCommand(newClient))
 	return root

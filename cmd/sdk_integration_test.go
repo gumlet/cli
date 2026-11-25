@@ -20,6 +20,7 @@ import (
 	"gumlet/cmd"
 	"gumlet/pkg/client"
 	"gumlet/pkg/credentials"
+	"gumlet/pkg/oauth"
 
 	"github.com/gumlet/golang-sdk/option"
 )
@@ -52,7 +53,7 @@ func runCLI(t *testing.T, baseURL, input string, args ...string) (stdout, stderr
 	})}
 
 	store := credentials.Store{Path: filepath.Join(t.TempDir(), ".gumlet.yaml")}
-	if _, err := store.Save("test-key"); err != nil {
+	if _, err := store.SaveToken(credentials.Token{AccessToken: "test-key"}); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv(credentials.EnvKey, "")
@@ -61,7 +62,7 @@ func runCLI(t *testing.T, baseURL, input string, args ...string) (stdout, stderr
 	t.Setenv("API_KEY", "wrong-key")
 
 	root := cmd.NewRootCommand(cmd.Options{Version: version, NewClient: func() (*client.Client, error) {
-		key, err := store.APIKey()
+		key, err := store.BearerToken(context.Background(), nil)
 		if err != nil {
 			return nil, err
 		}
@@ -493,10 +494,93 @@ func TestValidationBeforeClientCreation(t *testing.T) {
 	}
 }
 
-func TestLoginPrintsKeyDashboard(t *testing.T) {
-	_, stderr, err := runCLI(t, "", "", "login")
-	if err == nil || !strings.Contains(stderr, "https://dash.gumlet.com/developer/api-keys") {
-		t.Fatalf("login diagnostics = %q, err = %v", stderr, err)
+func TestOAuthLoginAndLogout(t *testing.T) {
+	t.Setenv(credentials.EnvKey, "")
+
+	var revokedToken atomic.Value
+	oauthServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		switch r.URL.Path {
+		case "/oauth/token":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"access_token":  "oauth-access",
+				"refresh_token": "oauth-refresh",
+				"token_type":    "Bearer",
+				"expires_in":    3600,
+			})
+		case "/oauth/revoke":
+			revokedToken.Store(r.Form.Get("token"))
+			w.WriteHeader(http.StatusOK)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer oauthServer.Close()
+
+	store := credentials.Store{Path: filepath.Join(t.TempDir(), ".gumlet.yaml")}
+	oauthCfg := oauth.Config{
+		TokenURL:     oauthServer.URL + "/oauth/token",
+		RevokeURL:    oauthServer.URL + "/oauth/revoke",
+		CallbackAddr: "127.0.0.1:0",
+		OpenBrowser: func(authURL string) error {
+			u, err := url.Parse(authURL)
+			if err != nil {
+				return err
+			}
+			if !strings.HasPrefix(authURL, oauth.DefaultAuthURL+"?") {
+				t.Errorf("unexpected auth URL: %s", authURL)
+			}
+			redirectURI := u.Query().Get("redirect_uri")
+			state := u.Query().Get("state")
+			go func() {
+				resp, err := http.Get(redirectURI + "?code=test-code&state=" + url.QueryEscape(state))
+				if err == nil {
+					_ = resp.Body.Close()
+				}
+			}()
+			return nil
+		},
+	}
+
+	var out, stderr bytes.Buffer
+	root := cmd.NewRootCommand(cmd.Options{Version: "1.2.3", Credentials: store, OAuth: oauthCfg})
+	root.SetOut(&out)
+	root.SetErr(&stderr)
+	root.SetArgs([]string{"login"})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := root.ExecuteContext(ctx); err != nil {
+		t.Fatalf("login failed: %v (stderr=%q)", err, stderr.String())
+	}
+	if !strings.Contains(out.String(), "Logged in!") || !strings.Contains(stderr.String(), oauth.DefaultAuthURL) {
+		t.Fatalf("unexpected login output: stdout=%q stderr=%q", out.String(), stderr.String())
+	}
+
+	tok, err := store.BearerToken(context.Background(), nil)
+	if err != nil || tok != "oauth-access" {
+		t.Fatalf("saved token = %q, err = %v", tok, err)
+	}
+
+	// Logout should revoke the refresh token and delete the credential file.
+	out.Reset()
+	stderr.Reset()
+	root = cmd.NewRootCommand(cmd.Options{Version: "1.2.3", Credentials: store, OAuth: oauthCfg})
+	root.SetOut(&out)
+	root.SetErr(&stderr)
+	root.SetIn(strings.NewReader("y\n"))
+	root.SetArgs([]string{"logout"})
+	if err := root.ExecuteContext(ctx); err != nil {
+		t.Fatalf("logout failed: %v (stderr=%q)", err, stderr.String())
+	}
+	if got, _ := revokedToken.Load().(string); got != "oauth-refresh" {
+		t.Errorf("revoked token = %q; want oauth-refresh", got)
+	}
+	if !strings.Contains(out.String(), "Logged out.") {
+		t.Errorf("unexpected logout stdout: %q", out.String())
+	}
+	if _, err := store.BearerToken(context.Background(), nil); err == nil {
+		t.Fatal("expected credentials to be removed after logout")
 	}
 }
 

@@ -22,13 +22,15 @@ Verify with `gumlet --version`.
 
 ## Authenticate
 
-Create a key in [Gumlet API Keys](https://dash.gumlet.com/developer/api-keys) and save it locally:
+Sign in with your Gumlet account in the browser (OAuth 2.0):
 
 ```sh
 gumlet login
 ```
 
-The key is stored in `~/.gumlet.yaml`. For CI or non-interactive environments, set `GUMLET_API_KEY` instead (takes precedence over the saved key). Run `gumlet logout` to remove the saved key.
+OAuth tokens are stored in `~/.gumlet.yaml` (`0600` permissions) and refreshed automatically. Run `gumlet logout` to revoke and remove saved credentials.
+
+For CI or non-interactive environments, create an API key in [Gumlet API Keys](https://dash.gumlet.com/developer/api-keys) and set `GUMLET_API_KEY` (takes precedence over saved OAuth credentials).
 
 ## Quickstart
 

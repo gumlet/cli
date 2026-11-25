@@ -16,40 +16,61 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"strings"
+	"time"
 
 	"gumlet/pkg/credentials"
+	"gumlet/pkg/oauth"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
-const apiKeysURL = "https://dash.gumlet.com/developer/api-keys"
+const loginTimeout = 5 * time.Minute
 
-func newLoginCommand(store credentials.Store) *cobra.Command {
-	return &cobra.Command{
+func newLoginCommand(store credentials.Store, oauthCfg oauth.Config) *cobra.Command {
+	var noBrowser bool
+	cmd := &cobra.Command{
 		Use:   "login",
-		Short: "Save a Gumlet API key",
+		Short: "Sign in to Gumlet via browser (OAuth 2.0)",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Create an API key in the Gumlet dashboard:\n  %s\n", apiKeysURL)
-			in, ok := cmd.InOrStdin().(*os.File)
-			if !ok || !term.IsTerminal(int(in.Fd())) {
-				return fmt.Errorf("login requires a terminal; for automation, set %s instead", credentials.EnvKey)
+			if strings.TrimSpace(os.Getenv(credentials.EnvKey)) != "" {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Note: %s is set in your environment and will take precedence over saved credentials.\n", credentials.EnvKey)
 			}
-			_, _ = fmt.Fprint(cmd.ErrOrStderr(), "API key (hidden): ")
-			key, err := term.ReadPassword(int(in.Fd()))
-			_, _ = fmt.Fprintln(cmd.ErrOrStderr())
-			if err != nil {
-				return fmt.Errorf("read API key: %w", err)
-			}
-			path, err := store.Save(string(key))
+			ctx, cancel := context.WithTimeout(cmd.Context(), loginTimeout)
+			defer cancel()
+
+			tok, err := oauthCfg.Login(ctx, oauth.LoginOptions{
+				NoBrowser: noBrowser,
+				OnAuthURL: func(authURL string, opened bool, openErr error) {
+					if opened {
+						_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Opening browser to sign in to Gumlet...\nIf the browser did not open, visit:\n  %s\n", authURL)
+					} else {
+						_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Open this URL in your browser to sign in to Gumlet:\n  %s\n", authURL)
+					}
+					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for authentication callback...")
+				},
+			})
 			if err != nil {
 				return err
 			}
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "API key saved to %s\nTry: gumlet video workspace list -o table\n", path)
+
+			path, err := store.SaveToken(credentials.Token{
+				AccessToken:  tok.AccessToken,
+				RefreshToken: tok.RefreshToken,
+				TokenType:    tok.TokenType,
+				ExpiresAt:    tok.ExpiresAt,
+			})
+			if err != nil {
+				return err
+			}
+			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Logged in! Credentials saved to %s\nTry: gumlet user get -o table\n", path)
 			return err
 		},
 	}
+	cmd.Flags().BoolVar(&noBrowser, "no-browser", false, "Print the sign-in URL instead of opening the browser automatically")
+	return cmd
 }

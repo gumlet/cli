@@ -107,19 +107,22 @@ Available on all commands:
 
 ### `gumlet login`
 
-Prompt interactively (hidden input) for a Gumlet API key and save it to `~/.gumlet.yaml`. Requires a TTY; use `GUMLET_API_KEY` in non-interactive environments.
+Sign in to Gumlet via browser using OAuth 2.0 (Authorization Code + PKCE with a localhost callback) and save the resulting tokens to `~/.gumlet.yaml`. For CI or non-interactive environments, create an API key in [Gumlet API Keys](https://dash.gumlet.com/developer/api-keys) and set `GUMLET_API_KEY` instead.
 
-*No command-specific flags.*
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--no-browser` | `bool` | `false` | Print the sign-in URL instead of opening the browser automatically. |
 
 ```sh
 gumlet login
+gumlet login --no-browser
 ```
 
 ---
 
 ### `gumlet logout`
 
-Prompt for confirmation (`y`/`N`) and remove the saved API key from `~/.gumlet.yaml`. Does not unset `GUMLET_API_KEY`.
+Prompt for confirmation (`y`/`N`), revoke the saved OAuth token, and remove `~/.gumlet.yaml`. Does not unset `GUMLET_API_KEY`.
 
 *No command-specific flags.*
 
