@@ -93,13 +93,9 @@ func (s Store) BearerToken(ctx context.Context, refresh Refresher) (string, erro
 		return "", err
 	}
 	if accessToken := strings.TrimSpace(cfg.AccessToken); accessToken != "" {
-		var expiresAt time.Time
-		if rawExp := strings.TrimSpace(cfg.ExpiresAt); rawExp != "" {
-			parsed, parseErr := time.Parse(time.RFC3339, rawExp)
-			if parseErr != nil {
-				return "", fmt.Errorf("invalid credential file %s; run 'gumlet login' to replace it", path)
-			}
-			expiresAt = parsed
+		expiresAt, err := parseExpiresAt(cfg.ExpiresAt, path)
+		if err != nil {
+			return "", err
 		}
 		if expiresAt.IsZero() || s.now().Add(refreshSkew).Before(expiresAt) {
 			return accessToken, nil
@@ -142,13 +138,9 @@ func (s Store) LoadToken() (Token, error) {
 	if accessToken == "" && refreshToken == "" {
 		return Token{}, ErrNoKey
 	}
-	var expiresAt time.Time
-	if rawExp := strings.TrimSpace(cfg.ExpiresAt); rawExp != "" {
-		parsed, parseErr := time.Parse(time.RFC3339, rawExp)
-		if parseErr != nil {
-			return Token{}, fmt.Errorf("invalid credential file %s; run 'gumlet login' to replace it", path)
-		}
-		expiresAt = parsed
+	expiresAt, err := parseExpiresAt(cfg.ExpiresAt, path)
+	if err != nil {
+		return Token{}, err
 	}
 	return Token{
 		AccessToken:  accessToken,
@@ -156,6 +148,18 @@ func (s Store) LoadToken() (Token, error) {
 		TokenType:    strings.TrimSpace(cfg.TokenType),
 		ExpiresAt:    expiresAt,
 	}, nil
+}
+
+func parseExpiresAt(raw, path string) (time.Time, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return time.Time{}, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid credential file %s; run 'gumlet login' to replace it", path)
+	}
+	return parsed, nil
 }
 
 // SaveToken persists OAuth credentials to ~/.gumlet.yaml with 0600 permissions.

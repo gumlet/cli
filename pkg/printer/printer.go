@@ -6,13 +6,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
+	"strconv"
 	"strings"
-	"text/tabwriter"
 	"unicode"
 
+	"gumlet/pkg/termui"
+
+	"github.com/charmbracelet/lipgloss"
+	ltable "github.com/charmbracelet/lipgloss/table"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
+	"github.com/tidwall/pretty"
 )
 
 // Table is an explicit view of an API response. RowsKey may be a dot-separated
@@ -33,28 +36,43 @@ type Table struct {
 type Field struct {
 	Label  string
 	Format func(value any, row map[string]any) string
-	// MaxWidth limits prose, in runes. Zero uses the default for names and
-	// descriptions; a negative value leaves the full text intact.
-	MaxWidth int
 }
 
 func Print(cmd *cobra.Command, data []byte, table Table) error {
 	data = bytes.TrimSpace(data)
 	out := cmd.OutOrStdout()
+	color := termui.ColorEnabled(cmd, out)
 	format, _ := cmd.Flags().GetString("output")
 	if format == "json" {
-		if len(data) == 0 {
-			return nil
-		}
-		var formatted bytes.Buffer
-		if err := json.Indent(&formatted, data, "", "  "); err != nil {
-			return errors.New("API returned an invalid JSON response")
-		}
-		formatted.WriteByte('\n')
-		_, err := formatted.WriteTo(out)
+		return printJSON(out, data, color)
+	}
+	return printTable(out, data, table, color)
+}
+
+var jsonStyle = func() *pretty.Style {
+	s := *pretty.TerminalStyle
+	s.Key = [2]string{"\x1b[36m", "\x1b[0m"}
+	s.True = [2]string{"\x1b[1;32m", "\x1b[0m"}
+	s.False = [2]string{"\x1b[31m", "\x1b[0m"}
+	s.Brackets = [2]string{"\x1b[2m", "\x1b[0m"}
+	return &s
+}()
+
+func printJSON(out io.Writer, data []byte, color bool) error {
+	if len(data) == 0 {
+		return nil
+	}
+	var formatted bytes.Buffer
+	if err := json.Indent(&formatted, data, "", "  "); err != nil {
+		return errors.New("API returned an invalid JSON response")
+	}
+	formatted.WriteByte('\n')
+	if color {
+		_, err := out.Write(pretty.Color(formatted.Bytes(), jsonStyle))
 		return err
 	}
-	return printTable(out, data, table, colorEnabled(cmd, out))
+	_, err := formatted.WriteTo(out)
+	return err
 }
 
 func printTable(out io.Writer, data []byte, table Table, color bool) error {
@@ -89,98 +107,176 @@ func printTable(out io.Writer, data []byte, table Table, color bool) error {
 			return fmt.Errorf("API response field %q is not an array", table.RowsKey)
 		}
 	}
+	style := termui.NewStyle(color)
 	var output bytes.Buffer
 	if table.Result != "" {
 		if failed {
-			fmt.Fprintln(&output, "API reported failure. Use -o json to inspect the response.")
+			fmt.Fprintln(&output, style.Failure("API reported failure. Use -o json to inspect the response."))
 		} else {
-			fmt.Fprintln(&output, table.Result)
+			fmt.Fprintln(&output, style.Success(table.Result))
 		}
 	}
 	if len(table.Columns) > 0 {
-		if err := table.writeBody(&output, value, color); err != nil {
+		if err := table.writeBody(&output, value, style); err != nil {
 			return err
 		}
 	}
 	if len(table.Summary) > 0 {
-		writer := tabwriter.NewWriter(&output, 0, 4, 2, ' ', 0)
-		table.writeFields(writer, root, table.Summary, true)
-		if err := writer.Flush(); err != nil {
-			return err
-		}
+		table.writeFields(&output, root, table.Summary, true, style)
 	}
 	var next any
 	if table.More != "" {
 		next, _ = lookup(root, table.More)
 	}
 	if more(next) || (table.HasMore != nil && table.HasMore(root)) {
-		fmt.Fprintln(&output, "More results are available. Use -o json for pagination details.")
+		fmt.Fprintln(&output, style.Hint("More results are available. Use -o json for pagination details."))
 	}
 	_, err := output.WriteTo(out)
 	return err
 }
 
-func (t Table) writeBody(out *bytes.Buffer, value any, color bool) error {
-	var body bytes.Buffer
-	writer := tabwriter.NewWriter(&body, 0, 4, 2, ' ', 0)
-	hasHeader := false
+func (t Table) writeBody(out *bytes.Buffer, value any, style termui.Style) error {
 	switch v := value.(type) {
 	case []any:
 		if len(v) == 0 {
 			if t.Result == "" {
-				fmt.Fprintln(writer, "No results found.")
+				fmt.Fprintln(out, style.Dim("No results found."))
 			}
-			break
+			return nil
 		}
-		hasHeader = true
-		labels := make([]string, len(t.Columns))
+		headers := make([]string, len(t.Columns))
 		for i, path := range t.Columns {
-			labels[i] = t.label(path)
+			headers[i] = style.BoldCyan(t.label(path))
 		}
-		fmt.Fprintln(writer, strings.Join(labels, "\t"))
-		values := make([]string, len(t.Columns))
+
+		rows := make([][]string, 0, len(v))
 		for _, item := range v {
 			row, ok := item.(map[string]any)
 			if !ok {
 				return errors.New("API response included an invalid table row; use -o json to inspect it")
 			}
+			cells := make([]string, len(t.Columns))
 			for i, path := range t.Columns {
-				values[i] = display(t.cell(row, path))
+				text := display(t.cell(row, path))
+				cells[i] = styleValue(style, path, text)
 			}
-			fmt.Fprintln(writer, strings.Join(values, "\t"))
+			rows = append(rows, cells)
 		}
+		writeTable(out, headers, rows)
 	case map[string]any:
-		t.writeFields(writer, v, t.Columns, t.Result != "")
+		t.writeFields(out, v, t.Columns, t.Result != "", style)
 	case nil:
 		if t.Result == "" {
-			fmt.Fprintln(writer, "No results found.")
+			fmt.Fprintln(out, style.Dim("No results found."))
 		}
 	default:
 		if t.Result == "" {
 			return errors.New("API response has no table fields; use -o json to inspect it")
 		}
 	}
-	if err := writer.Flush(); err != nil {
-		return err
-	}
-	if color && hasHeader {
-		// Style the header after layout so ANSI codes don't affect column widths.
-		header, rows, _ := bytes.Cut(body.Bytes(), []byte("\n"))
-		fmt.Fprintf(out, "\x1b[1m%s\x1b[0m\n%s", header, rows)
-	} else {
-		out.Write(body.Bytes())
-	}
 	return nil
 }
 
-func (t Table) writeFields(w io.Writer, row map[string]any, paths []string, omitMissing bool) {
+func (t Table) writeFields(out *bytes.Buffer, row map[string]any, paths []string, omitMissing bool, style termui.Style) {
+	rows := make([][]string, 0, len(paths))
 	for _, path := range paths {
 		text := t.cell(row, path)
 		if text == "" && omitMissing {
 			continue
 		}
-		fmt.Fprintf(w, "%s\t%s\n", t.label(path), display(text))
+		lbl := t.label(path)
+		val := display(text)
+		rows = append(rows, []string{
+			style.BoldCyan(lbl),
+			styleValue(style, path, val),
+		})
 	}
+	writeTable(out, nil, rows)
+}
+
+func writeTable(out *bytes.Buffer, headers []string, rows [][]string) {
+	if len(headers) == 0 && len(rows) == 0 {
+		return
+	}
+	// lipgloss/table v1.1.0 miscomputes MaxHeight by -1 when Headers is empty
+	// and borders are disabled, which drops the final row. Promote the first row
+	// to Headers so all rows are rendered identically.
+	if len(headers) == 0 {
+		headers = rows[0]
+		rows = rows[1:]
+	}
+	cols := len(headers)
+	cellStyle := lipgloss.NewStyle().PaddingRight(2)
+	lastColStyle := lipgloss.NewStyle()
+	tbl := ltable.New().
+		BorderTop(false).
+		BorderBottom(false).
+		BorderLeft(false).
+		BorderRight(false).
+		BorderHeader(false).
+		BorderColumn(false).
+		BorderRow(false).
+		StyleFunc(func(_, col int) lipgloss.Style {
+			if col < cols-1 {
+				return cellStyle
+			}
+			return lastColStyle
+		}).
+		Headers(headers...).
+		Rows(rows...)
+	for line := range strings.SplitSeq(tbl.Render(), "\n") {
+		out.WriteString(strings.TrimRight(line, " "))
+		out.WriteByte('\n')
+	}
+}
+
+func styleValue(style termui.Style, path, text string) string {
+	if !style.Color() {
+		return text
+	}
+	if text == "—" {
+		return style.Dim(text)
+	}
+	if strings.HasPrefix(text, "https://") || strings.HasPrefix(text, "http://") {
+		return style.Link(text)
+	}
+	key := leaf(path)
+	lower := strings.ToLower(strings.TrimSpace(text))
+	if key == "status" || key == "status_code" {
+		switch lower {
+		case "ready", "active", "paid", "complete", "completed", "published", "ok", "success":
+			return style.Green(text)
+		case "processing", "queued", "pre-queued", "preparing", "invited", "pending", "open", "created", "in_progress":
+			return style.Yellow(text)
+		case "error", "errored", "failed", "failure", "cancelled", "canceled", "deleted", "uncollectible":
+			return style.Red(text)
+		case "void", "inactive", "draft":
+			return style.Dim(text)
+		}
+		if code, err := strconv.Atoi(lower); err == nil {
+			switch {
+			case code >= 200 && code < 300:
+				return style.Green(text)
+			case code >= 400:
+				return style.Red(text)
+			case code >= 300:
+				return style.Yellow(text)
+			}
+		}
+	}
+	if lower == "true" || lower == "false" {
+		if key == "unpaid" || key == "unpaid_invoices" {
+			if lower == "true" {
+				return style.Yellow(text)
+			}
+			return style.Green(text)
+		}
+		if lower == "true" {
+			return style.Green(text)
+		}
+		return style.Dim(text)
+	}
+	return text
 }
 
 func lookup(value any, path string) (any, bool) {
@@ -217,17 +313,11 @@ func (t Table) cell(row map[string]any, path string) string {
 		text = cfg.Format(value, row)
 	}
 	text = clean(text)
-	limit := cfg.MaxWidth
-	if limit == 0 {
-		switch leaf(path) {
-		case "name", "title", "description":
-			limit = 50
-		}
-	}
-	if limit > 0 {
-		runes := []rune(text)
-		if len(runes) > limit {
-			return string(runes[:limit-1]) + "…"
+	switch leaf(path) {
+	case "name", "title", "description":
+		const maxProseWidth = 50
+		if runes := []rune(text); len(runes) > maxProseWidth {
+			return string(runes[:maxProseWidth-1]) + "…"
 		}
 	}
 	return text
@@ -247,10 +337,7 @@ func scalar(value any) string {
 	case json.Number:
 		return v.String()
 	case bool:
-		if v {
-			return "true"
-		}
-		return "false"
+		return strconv.FormatBool(v)
 	default:
 		return ""
 	}
@@ -307,11 +394,4 @@ func clean(text string) string {
 		}
 		return r
 	}, text)
-}
-
-func colorEnabled(cmd *cobra.Command, out io.Writer) bool {
-	disabled, _ := cmd.Flags().GetBool("no-color")
-	_, noColor := os.LookupEnv("NO_COLOR")
-	file, ok := out.(*os.File)
-	return !disabled && !noColor && ok && term.IsTerminal(int(file.Fd()))
 }

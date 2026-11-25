@@ -20,6 +20,7 @@ import (
 	"os"
 
 	"gumlet/cmd"
+	"gumlet/pkg/termui"
 )
 
 var (
@@ -31,7 +32,13 @@ var (
 func main() {
 	root := cmd.NewRootCommand(cmd.Options{Version: version, Commit: commit, Date: date})
 	if err := root.Execute(); err != nil {
-		fmt.Fprintln(root.ErrOrStderr(), "Error:", err)
+		stderr := root.ErrOrStderr()
+		style := termui.StyleFor(root, stderr)
+		if style.Color() {
+			fmt.Fprintf(stderr, "%s %v\n", style.BoldRed("✗ Error:"), err)
+		} else {
+			fmt.Fprintln(stderr, "Error:", err)
+		}
 		os.Exit(1)
 	}
 }

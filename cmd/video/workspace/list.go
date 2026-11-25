@@ -1,6 +1,8 @@
 package workspace
 
 import (
+	"time"
+
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
@@ -31,7 +33,7 @@ func newListCommand(newClient client.Factory) *cobra.Command {
 				RowsKey: "all_sources",
 				Columns: []string{"id", "name", "type", "created_at"},
 				Fields: map[string]printer.Field{
-					"created_at": {Label: "Created", Format: printer.Date("2006-01-02", nil)},
+					"created_at": {Label: "Created", Format: printer.Date(time.DateOnly, nil)},
 				},
 				More: "next_page_token",
 			})

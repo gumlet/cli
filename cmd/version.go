@@ -18,6 +18,8 @@ package cmd
 import (
 	"fmt"
 
+	"gumlet/pkg/termui"
+
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +33,21 @@ func newVersionCommand(version, commit, date string) *cobra.Command {
 		Short: "Print version information",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, err := fmt.Fprint(cmd.OutOrStdout(), versionText(version, commit, date))
+			out := cmd.OutOrStdout()
+			style := termui.StyleFor(cmd, out)
+			if !style.Color() {
+				_, err := fmt.Fprint(out, versionText(version, commit, date))
+				return err
+			}
+			_, err := fmt.Fprintf(out, "%s %s %s\n%s %s\n%s %s\n",
+				style.BoldCyan("gumlet"),
+				style.Dim("version"),
+				style.Bold(version),
+				style.Dim("commit:"),
+				commit,
+				style.Dim("built:"),
+				date,
+			)
 			return err
 		},
 	}

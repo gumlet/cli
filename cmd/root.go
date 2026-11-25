@@ -48,12 +48,7 @@ func NewRootCommand(opts Options) *cobra.Command {
 				if err != nil {
 					return credentials.Token{}, err
 				}
-				return credentials.Token{
-					AccessToken:  tok.AccessToken,
-					RefreshToken: tok.RefreshToken,
-					TokenType:    tok.TokenType,
-					ExpiresAt:    tok.ExpiresAt,
-				}, nil
+				return credentialsToken(tok), nil
 			})
 			if err != nil {
 				return nil, err
@@ -91,4 +86,13 @@ Use --output table for human-friendly tables, or --output json for scripts.`,
 		newVersionCommand(opts.Version, opts.Commit, opts.Date), image.NewCommand(newClient), video.NewCommand(newClient))
 	root.AddCommand(newUserCommand(newClient), newOrgCommand(newClient), newAuditLogCommand(newClient), newBillingCommand(newClient))
 	return root
+}
+
+func credentialsToken(tok oauth.Token) credentials.Token {
+	return credentials.Token{
+		AccessToken:  tok.AccessToken,
+		RefreshToken: tok.RefreshToken,
+		TokenType:    tok.TokenType,
+		ExpiresAt:    tok.ExpiresAt,
+	}
 }

@@ -3,11 +3,18 @@ package printer
 import (
 	"bytes"
 	"errors"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
 )
+
+var ansiPattern = regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]`)
+
+func stripANSI(s string) string {
+	return ansiPattern.ReplaceAllString(s, "")
+}
 
 func TestPrintJSON(t *testing.T) {
 	var out bytes.Buffer
@@ -49,20 +56,59 @@ func TestPrintTable(t *testing.T) {
 
 func TestStyledTableHeaderAlignment(t *testing.T) {
 	var out bytes.Buffer
-	table := Table{Columns: []string{"id", "name", "type"}}
-	data := []byte(`[{"id":"abcdef0123456789","name":"Direct Upload","type":"direct-upload"}]`)
+	table := Table{Columns: []string{"id", "name", "status", "type"}}
+	data := []byte(`[{"id":"abcdef0123456789","name":"Direct Upload","status":"ready","type":"direct-upload"}]`)
 	if err := printTable(&out, data, table, true); err != nil {
 		t.Fatal(err)
 	}
 	header, row, _ := strings.Cut(out.String(), "\n")
-	if !strings.Contains(header, "\x1b[1m") {
+	if !strings.Contains(header, "\x1b[1;36m") {
 		t.Fatalf("expected styled header: %q", header)
 	}
-	header = strings.NewReplacer("\x1b[1m", "", "\x1b[0m", "").Replace(header)
-	for _, column := range [][2]string{{"NAME", "Direct Upload"}, {"TYPE", "direct-upload"}} {
-		if strings.Index(header, column[0]) != strings.Index(row, column[1]) {
-			t.Errorf("%s is misaligned:\n%s\n%s", column[0], header, row)
+	if !strings.Contains(row, "\x1b[32mready\x1b[0m") {
+		t.Fatalf("expected green status cell: %q", row)
+	}
+	plainHeader := stripANSI(header)
+	plainRow := stripANSI(row)
+	for _, column := range [][2]string{{"NAME", "Direct Upload"}, {"STATUS", "ready"}, {"TYPE", "direct-upload"}} {
+		if strings.Index(plainHeader, column[0]) != strings.Index(plainRow, column[1]) {
+			t.Errorf("%s is misaligned:\n%s\n%s", column[0], plainHeader, plainRow)
 		}
+	}
+}
+
+func TestKeyValueTableRendersAllRows(t *testing.T) {
+	var out bytes.Buffer
+	table := Table{Columns: []string{"id", "name", "status"}}
+	data := []byte(`{"id":"asset-1","name":"日本語タイトル","status":"ready"}`)
+	if err := printTable(&out, data, table, true); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSuffix(out.String(), "\n"), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("got %d lines, want 3:\n%s", len(lines), out.String())
+	}
+	for i, want := range []string{"ID", "NAME", "STATUS"} {
+		if !strings.HasPrefix(stripANSI(lines[i]), want) {
+			t.Errorf("line %d = %q, want prefix %q", i, stripANSI(lines[i]), want)
+		}
+	}
+}
+
+func TestStyledJSONOutput(t *testing.T) {
+	var out bytes.Buffer
+	if err := printJSON(&out, []byte(`{"id":"asset-1","ready":true,"deleted":false}`), true); err != nil {
+		t.Fatal(err)
+	}
+	got := out.String()
+	for _, wantCode := range []string{"\x1b[36m\"id\"\x1b[0m", "\x1b[1;32mtrue\x1b[0m", "\x1b[31mfalse\x1b[0m"} {
+		if !strings.Contains(got, wantCode) {
+			t.Fatalf("expected %q in colorized JSON: %q", wantCode, got)
+		}
+	}
+	want := "{\n  \"id\": \"asset-1\",\n  \"ready\": true,\n  \"deleted\": false\n}\n"
+	if stripped := stripANSI(got); stripped != want {
+		t.Errorf("stripped JSON = %q, want %q", stripped, want)
 	}
 }
 

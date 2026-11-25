@@ -24,6 +24,7 @@ import (
 
 	"gumlet/pkg/credentials"
 	"gumlet/pkg/oauth"
+	"gumlet/pkg/termui"
 
 	"github.com/spf13/cobra"
 )
@@ -37,37 +38,47 @@ func newLoginCommand(store credentials.Store, oauthCfg oauth.Config) *cobra.Comm
 		Short: "Sign in to Gumlet via browser (OAuth 2.0)",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			stderr := cmd.ErrOrStderr()
+			errStyle := termui.StyleFor(cmd, stderr)
+			out := cmd.OutOrStdout()
+			outStyle := termui.StyleFor(cmd, out)
+
 			if strings.TrimSpace(os.Getenv(credentials.EnvKey)) != "" {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Note: %s is set in your environment and will take precedence over saved credentials.\n", credentials.EnvKey)
+				msg := fmt.Sprintf("Note: %s is set in your environment and will take precedence over saved credentials.", credentials.EnvKey)
+				_, _ = fmt.Fprintln(stderr, errStyle.Warn(msg))
 			}
 			ctx, cancel := context.WithTimeout(cmd.Context(), loginTimeout)
 			defer cancel()
 
+			var spinner *termui.Spinner
 			tok, err := oauthCfg.Login(ctx, oauth.LoginOptions{
 				NoBrowser: noBrowser,
 				OnAuthURL: func(authURL string, opened bool, openErr error) {
+					styledURL := errStyle.Link(authURL)
 					if opened {
-						_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Opening browser to sign in to Gumlet...\nIf the browser did not open, visit:\n  %s\n", authURL)
+						_, _ = fmt.Fprintf(stderr, "Opening browser to sign in to Gumlet...\n%s\n  %s\n",
+							errStyle.Dim("If the browser did not open, visit:"), styledURL)
 					} else {
-						_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Open this URL in your browser to sign in to Gumlet:\n  %s\n", authURL)
+						_, _ = fmt.Fprintf(stderr, "Open this URL in your browser to sign in to Gumlet:\n  %s\n", styledURL)
 					}
-					_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Waiting for authentication callback...")
+					spinner = termui.StartSpinner(stderr, "Waiting for authentication callback...", errStyle.Color())
 				},
 			})
 			if err != nil {
+				spinner.Fail("Authentication failed")
 				return err
 			}
+			spinner.Succeed("Authenticated with Gumlet")
 
-			path, err := store.SaveToken(credentials.Token{
-				AccessToken:  tok.AccessToken,
-				RefreshToken: tok.RefreshToken,
-				TokenType:    tok.TokenType,
-				ExpiresAt:    tok.ExpiresAt,
-			})
+			path, err := store.SaveToken(credentialsToken(tok))
 			if err != nil {
 				return err
 			}
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Logged in! Credentials saved to %s\nTry: gumlet user get -o table\n", path)
+			_, err = fmt.Fprintf(out, "%s Credentials saved to %s\n%s\n",
+				outStyle.Success(outStyle.Bold("Logged in!")),
+				outStyle.Dim(path),
+				outStyle.Hint("Try: "+outStyle.Cyan("gumlet user get -o table")),
+			)
 			return err
 		},
 	}

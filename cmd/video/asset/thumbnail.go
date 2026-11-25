@@ -4,13 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"mime"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
+	"gumlet/pkg/termui"
 
 	sdk "github.com/gumlet/golang-sdk"
 	"github.com/gumlet/golang-sdk/option"
@@ -27,7 +26,7 @@ func newThumbnailUploadCommand(newClient client.Factory) *cobra.Command {
 			if strings.TrimSpace(assetID) == "" {
 				return fmt.Errorf("--asset-id must not be empty")
 			}
-			file, info, err := openVideo(filePath)
+			file, info, err := openUploadFile(filePath, "thumbnail")
 			if err != nil {
 				return err
 			}
@@ -38,26 +37,21 @@ func newThumbnailUploadCommand(newClient client.Factory) *cobra.Command {
 				return err
 			}
 			stderr := cmd.ErrOrStderr()
-			fmt.Fprintln(stderr, "Requesting thumbnail upload URL...")
+			color := termui.ColorEnabled(cmd, stderr)
+
+			sessionSpin := termui.StartSpinner(stderr, "Requesting thumbnail upload URL...", color)
 			result, err := api.VideoAssets.ThumbnailUpload(cmd.Context(), assetID)
 			if err != nil {
+				sessionSpin.Fail("Could not request thumbnail upload URL")
 				return err
 			}
 			if result == nil || result.UploadURL == "" {
+				sessionSpin.Fail("Thumbnail upload response missing signed URL")
 				return fmt.Errorf("thumbnail upload response did not include a signed upload URL")
 			}
+			sessionSpin.Succeed("Thumbnail upload URL ready")
 
-			contentType := mime.TypeByExtension(filepath.Ext(filePath))
-			if contentType == "" {
-				contentType = "application/octet-stream"
-			}
-			fmt.Fprintln(stderr, "Uploading thumbnail...")
-			progress := uploadProgress(stderr, info.Size())
-			err = client.Upload(cmd.Context(), result.UploadURL, file, info.Size(), contentType, progress)
-			if progress != nil {
-				fmt.Fprintln(stderr)
-			}
-			if err != nil {
+			if err := uploadFile(cmd, result.UploadURL, filePath, file, info.Size(), "thumbnail", color); err != nil {
 				return fmt.Errorf("thumbnail upload failed: %w", err)
 			}
 

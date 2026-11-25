@@ -252,23 +252,8 @@ func (c Config) Revoke(ctx context.Context, token, tokenTypeHint string) error {
 	if tokenTypeHint != "" {
 		form.Set("token_type_hint", tokenTypeHint)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.RevokeURL, strings.NewReader(form.Encode()))
-	if err != nil {
-		return fmt.Errorf("build revoke request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("revoke token: %w", err)
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return parseOAuthError("revoke token", resp.StatusCode, body)
-	}
-	return nil
+	_, err := c.postForm(ctx, c.RevokeURL, "revoke token", form)
+	return err
 }
 
 func (c Config) buildAuthURL(redirectURI, state, challenge string) (string, error) {
@@ -299,26 +284,34 @@ type tokenResponse struct {
 	ErrorDescription string `json:"error_description"`
 }
 
-func (c Config) postToken(ctx context.Context, form url.Values) (Token, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.TokenURL, strings.NewReader(form.Encode()))
+func (c Config) postForm(ctx context.Context, endpoint, action string, form url.Values) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
 	if err != nil {
-		return Token{}, fmt.Errorf("build token request: %w", err)
+		return nil, fmt.Errorf("build %s request: %w", action, err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return Token{}, fmt.Errorf("request token: %w", err)
+		return nil, fmt.Errorf("%s: %w", action, err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
-		return Token{}, fmt.Errorf("read token response: %w", err)
+		return nil, fmt.Errorf("read %s response: %w", action, err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return Token{}, parseOAuthError("token exchange", resp.StatusCode, body)
+		return nil, parseOAuthError(action, resp.StatusCode, body)
+	}
+	return body, nil
+}
+
+func (c Config) postToken(ctx context.Context, form url.Values) (Token, error) {
+	body, err := c.postForm(ctx, c.TokenURL, "token exchange", form)
+	if err != nil {
+		return Token{}, err
 	}
 
 	var tr tokenResponse

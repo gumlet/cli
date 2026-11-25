@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"gumlet/cmd/video/internal/pagination"
 	"gumlet/pkg/client"
 	"gumlet/pkg/printer"
 
@@ -13,13 +14,16 @@ import (
 )
 
 func newListCommand(newClient client.Factory) *cobra.Command {
-	var workspaceID, status, tag, title, folderID, playlistID, sortBy, orderBy, token string
-	var pageNumber, pageSize int64
+	var workspaceID, status, tag, title, folderID, playlistID, sortBy, orderBy string
+	var page pagination.Page
 	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List assets in a video workspace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := page.Validate(cmd); err != nil {
+				return err
+			}
 			params := sdk.VideoAssetListParams{}
 			if status != "" {
 				params.Status = sdk.String(status)
@@ -50,23 +54,17 @@ func newListCommand(newClient client.Factory) *cobra.Command {
 				}
 				params.OrderBy = sdk.F(order)
 			}
-			if cmd.Flags().Changed("page-number") {
-				if pageNumber < 1 {
-					return fmt.Errorf("--page-number must be at least 1")
-				}
-				params.PageNumber = sdk.Int(pageNumber)
+			if page.Number != 0 {
+				params.PageNumber = sdk.Int(page.Number)
 			}
-			if cmd.Flags().Changed("page-size") {
-				if pageSize < 1 || pageSize > 100 {
-					return fmt.Errorf("--page-size must be between 1 and 100")
-				}
-				params.PageSize = sdk.Int(pageSize)
+			if page.Size != 0 {
+				params.PageSize = sdk.Int(page.Size)
 			}
-			if token != "" {
+			if page.Token != "" {
 				if title != "" || (sortBy != "" && sortBy != "created_at") {
 					return fmt.Errorf("--next-page-token requires the default or created_at sort and no title filter")
 				}
-				params.NextPageToken = sdk.String(token)
+				params.NextPageToken = sdk.String(page.Token)
 			}
 			apiClient, err := newClient()
 			if err != nil {
@@ -100,9 +98,6 @@ func newListCommand(newClient client.Factory) *cobra.Command {
 	listCmd.Flags().StringVar(&playlistID, "playlist-id", "", "Filter by playlist ID")
 	listCmd.Flags().StringVar(&sortBy, "sort-by", "", "Sort by created_at, uploaded_at, title, duration or status")
 	listCmd.Flags().StringVar(&orderBy, "order-by", "", "Sort direction: asc or desc")
-	listCmd.Flags().Int64Var(&pageNumber, "page-number", 1, "Page number (starts at 1)")
-	listCmd.Flags().Int64Var(&pageSize, "page-size", 20, "Page size (1–100)")
-	listCmd.Flags().StringVar(&token, "next-page-token", "", "Cursor returned by the previous page")
-	listCmd.MarkFlagsMutuallyExclusive("page-number", "next-page-token")
+	page.Bind(listCmd)
 	return listCmd
 }
