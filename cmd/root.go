@@ -70,6 +70,6 @@ Use --output table for human-friendly tables, or --output json for scripts.`,
 	root.SetVersionTemplate(versionText(opts.Version, opts.Commit, opts.Date))
 	root.AddCommand(newLoginCommand(opts.Credentials), newLogoutCommand(opts.Credentials),
 		newVersionCommand(opts.Version, opts.Commit, opts.Date), image.NewCommand(newClient), video.NewCommand(newClient))
-	root.AddCommand(newUserCommand(newClient), newBillingCommand(newClient))
+	root.AddCommand(newUserCommand(newClient), newOrgCommand(newClient), newAuditLogCommand(newClient), newBillingCommand(newClient))
 	return root
 }

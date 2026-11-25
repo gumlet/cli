@@ -16,9 +16,11 @@ type Client struct {
 	RecycleBin      *sdk.RecycleBinService
 	UserData        *sdk.UserDataService
 	Billing         *sdk.BillingService
-	ChannelViewers  *sdk.ChannelViewerService
-	LiveWorkspaces  *sdk.LiveStreamWorkspaceService
-	LiveAssets      *sdk.LiveStreamAssetService
+	ChannelViewers   *sdk.ChannelViewerService
+	LiveWorkspaces   *sdk.LiveStreamWorkspaceService
+	LiveAssets       *sdk.LiveStreamAssetService
+	OrganizationData *sdk.OrganizationDataService
+	AuditLogs        *sdk.AuditLogService
 }
 
 type Factory func() (*Client, error)
@@ -47,8 +49,10 @@ func New(apiKey, version string, extra ...option.RequestOption) *Client {
 		RecycleBin:      sdk.NewRecycleBinService(opts...),
 		UserData:        sdk.NewUserDataService(opts...),
 		Billing:         sdk.NewBillingService(opts...),
-		ChannelViewers:  sdk.NewChannelViewerService(opts...),
-		LiveWorkspaces:  sdk.NewLiveStreamWorkspaceService(opts...),
-		LiveAssets:      sdk.NewLiveStreamAssetService(opts...),
+		ChannelViewers:   sdk.NewChannelViewerService(opts...),
+		LiveWorkspaces:   sdk.NewLiveStreamWorkspaceService(opts...),
+		LiveAssets:       sdk.NewLiveStreamAssetService(opts...),
+		OrganizationData: sdk.NewOrganizationDataService(opts...),
+		AuditLogs:        sdk.NewAuditLogService(opts...),
 	}
 }

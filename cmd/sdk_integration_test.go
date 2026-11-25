@@ -125,6 +125,11 @@ func TestSDKRequests(t *testing.T) {
 		{"legacy source update", "POST", "/v1/image/sources/src", "", `{"type":"amazon","amazon":{"bucket_name":"example"}}`, `{"id":"src"}`, `{"id":"src"}`, []string{"image", "source", "update", "--source-id", "src", "--type", "amazon", "--config", `{"bucket_name":"example"}`}, 200},
 		{"source purge", "POST", "/v1/image/purge/src", "", `{"paths":["/photo.jpg","banner.png"]}`, `{"status":"ok"}`, `{"status":"ok"}`, []string{"image", "purge", "--source-id", "src", "--urls", "/photo.jpg,banner.png"}, 200},
 		{"current user", "GET", "/v1/user/data", "", "", user, user, []string{"user", "get"}, 200},
+		{"org details", "GET", "/v1/org/data", "", "", `{"id":"org-1","org_email":"ops@example.com","plan":"business","plan_cycle":"monthly","unpaid":false,"sso_enabled":true,"created_at":1704067200000,"plan_data":{"video":{"display_name":"Video Pro"},"image":{"display_name":"Image Pro"}}}`, `{"id":"org-1","org_email":"ops@example.com","plan":"business","plan_cycle":"monthly","unpaid":false,"sso_enabled":true,"created_at":1704067200000,"plan_data":{"video":{"display_name":"Video Pro"},"image":{"display_name":"Image Pro"}}}`, []string{"org", "get"}, 200},
+		{"audit logs", "POST", "/v1/user/audit-log", "", `{"date_range":{"start_at":"2026-08-01","end_at":"2026-08-31"},"page_number":2,"page_size":50,"user_email":["ops@example.com"],"activity_type":["video_uploaded","workspace_created"]}`, `{"pagination":{"page":2,"page_size":50,"total_pages":3,"total":120},"data":[{"timestamp":1704067200000,"activity":"Video Uploaded","action_user":"ops@example.com","status_code":200,"ip":"192.0.2.10","source":{"id":"asset-1","type":"asset"}}]}`, `{"pagination":{"page":2,"page_size":50,"total_pages":3,"total":120},"data":[{"timestamp":1704067200000,"activity":"Video Uploaded","action_user":"ops@example.com","status_code":200,"ip":"192.0.2.10","source":{"id":"asset-1","type":"asset"}}]}`, []string{"audit-log", "list", "--start-at", "2026-08-01", "--end-at", "2026-08-31", "--page-number", "2", "--page-size", "50", "--user-email", "ops@example.com", "--activity-type", "video_uploaded,workspace_created"}, 200},
+		{"asset create from url", "POST", "/v1/video/assets", "", `{"workspace_id":"ws","input":"https://example.com/video.mp4","format":"ABR","title":"Demo","tag":["launch"],"folder":"fld-1","mp4_access":true}`, `{"asset_id":"asset-1","status":"pre-queued","workspace_id":"ws","input":{"title":"Demo"}}`, `{"asset_id":"asset-1","status":"pre-queued","workspace_id":"ws","input":{"title":"Demo"}}`, []string{"video", "asset", "create", "--workspace-id", "ws", "--input", "https://example.com/video.mp4", "--title", "Demo", "--tag", "launch", "--folder-id", "fld-1", "--mp4-access"}, 200},
+		{"asset create with profile", "POST", "/v1/video/assets", "", `{"workspace_id":"ws","input":"https://example.com/video.mp4","profile_id":"prof-1"}`, `{"asset_id":"asset-2","status":"pre-queued"}`, `{"asset_id":"asset-2","status":"pre-queued"}`, []string{"video", "asset", "create", "--workspace-id", "ws", "--input", "https://example.com/video.mp4", "--profile-id", "prof-1"}, 200},
+		{"asset thumbnail select", "POST", "/v1/video/assets/asset-1/thumbnail-select", "", `{"frame_at_second":2.5}`, `{"success":true,"asset_id":"asset-1","thumbnail_updated_at":1704067200000}`, `{"success":true,"asset_id":"asset-1","thumbnail_updated_at":1704067200000}`, []string{"video", "asset", "thumbnail-select", "--asset-id", "asset-1", "--frame-at-second", "2.5"}, 200},
 		{"invoice history", "GET", "/v1/mixed/billing/invoice/history", "", "", history, history, []string{"billing", "invoice", "history"}, 200},
 		{"empty invoice history", "GET", "/v1/mixed/billing/invoice/history", "", "", `{"stripe_invoices":[],"unpaid_invoices":false}`, `{"stripe_invoices":[],"unpaid_invoices":false}`, []string{"billing", "invoice", "history"}, 200},
 		{"upcoming invoice", "GET", "/v1/mixed/billing/invoice/upcoming", "", "", upcoming, upcoming, []string{"billing", "invoice", "upcoming"}, 200},
@@ -462,6 +467,17 @@ func TestValidationBeforeClientCreation(t *testing.T) {
 		{[]string{"video", "playlist", "reorder", "--playlist-id", "pl", "--sort-by", "title", "--sort-order", "asc", "--asset-id", "one"}, "asset-id"},
 		{[]string{"video", "playlist", "reorder", "--playlist-id", "pl", "--asset-id", "one", "--page-number", "1", "--page-size", "20", "--asset-position", "20"}, "--asset-position"},
 		{[]string{"video", "playlist", "reorder", "--playlist-id", "pl", "--sort-by", "status", "--sort-order", "asc"}, "invalid --sort-by"},
+		{[]string{"video", "asset", "create", "--workspace-id", " ", "--input", "https://example.com/v.mp4"}, "--workspace-id"},
+		{[]string{"video", "asset", "create", "--workspace-id", "ws", "--input", " "}, "--input"},
+		{[]string{"video", "asset", "create", "--workspace-id", "ws", "--input", "https://example.com/v.mp4", "--format", "HLS"}, "invalid --format"},
+		{[]string{"video", "asset", "thumbnail-upload", "--asset-id", " ", "--file", "thumb.png"}, "--asset-id"},
+		{[]string{"video", "asset", "thumbnail-select", "--asset-id", " ", "--frame-at-second", "1"}, "--asset-id"},
+		{[]string{"video", "asset", "thumbnail-select", "--asset-id", "asset-1", "--frame-at-second", "-1"}, "non-negative"},
+		{[]string{"audit-log", "list", "--start-at", "2026/08/01", "--end-at", "2026-08-31"}, "YYYY-MM-DD"},
+		{[]string{"audit-log", "list", "--start-at", "2026-08-31", "--end-at", "2026-08-01"}, "before --start-at"},
+		{[]string{"audit-log", "list", "--start-at", "2026-08-01", "--end-at", "2026-08-31", "--page-size", "5"}, "between 10 and 500"},
+		{[]string{"audit-log", "list", "--start-at", "2026-08-01", "--end-at", "2026-08-31", "--user-email", "not-an-email"}, "bare email"},
+		{[]string{"audit-log", "list", "--start-at", "2026-08-01", "--end-at", "2026-08-31", "--activity-type", "unknown_event"}, "invalid --activity-type"},
 	} {
 		root := cmd.NewRootCommand(cmd.Options{NewClient: func() (*client.Client, error) {
 			t.Fatal("created API client for invalid input")
@@ -550,5 +566,74 @@ func TestUploadFailureReportsAssetNotSignature(t *testing.T) {
 	out, stderr, err := runCLI(t, api.URL, "", "video", "asset", "upload", "--file", file, "--workspace-id", "ws")
 	if err == nil || !strings.Contains(err.Error(), "new-asset") || strings.Contains(err.Error()+stderr, "secret-test") || out != "" || unexpectedRedirect.Load() {
 		t.Fatalf("stdout = %q, stderr = %q, err = %v, redirected = %t", out, stderr, err, unexpectedRedirect.Load())
+	}
+}
+
+func TestSDKThumbnailUpload(t *testing.T) {
+	img := "fake png bytes"
+	file := filepath.Join(t.TempDir(), "thumb.png")
+	if err := os.WriteFile(file, []byte(img), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var uploads atomic.Int32
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		uploads.Add(1)
+		body, err := io.ReadAll(r.Body)
+		if err != nil || string(body) != img || r.Method != "PUT" || r.URL.RawQuery != "signature=thumb" || r.Header.Get("Authorization") != "" {
+			t.Errorf("unexpected thumbnail upload: %s %s, auth=%t, body=%q, err=%v", r.Method, r.URL, r.Header.Get("Authorization") != "", body, err)
+		}
+	}))
+	defer storage.Close()
+
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" || r.URL.Path != "/v1/video/assets/asset-1/thumbnail" || r.Header.Get("Authorization") != "Bearer test-key" {
+			t.Errorf("unexpected thumbnail session request: %s %s", r.Method, r.URL)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"asset_id":             "asset-1",
+			"upload_url":           storage.URL + "/thumb.png?signature=thumb",
+			"thumbnail_updated_at": 1704067200000,
+		})
+	}))
+	defer api.Close()
+
+	out, stderr, err := runCLI(t, api.URL, "", "video", "asset", "thumbnail-upload", "--asset-id", "asset-1", "--file", file)
+	if err != nil || uploads.Load() != 1 || !strings.Contains(stderr, "Uploading thumbnail") {
+		t.Fatalf("upload count=%d, err=%v, output=%s", uploads.Load(), err, out)
+	}
+	checkJSON(t, []byte(out), `{"asset_id":"asset-1","uploaded":true,"thumbnail_updated_at":1704067200000}`)
+	if strings.Contains(out, "signature=") {
+		t.Fatalf("signed URL leaked in output: %s", out)
+	}
+
+	table, _, err := runCLI(t, api.URL, "", "video", "asset", "thumbnail-upload", "--asset-id", "asset-1", "--file", file, "-o", "table")
+	if err != nil || uploads.Load() != 2 || !strings.Contains(table, "Thumbnail uploaded.") || !strings.Contains(table, "asset-1") || strings.Contains(table, "signature=") {
+		t.Fatalf("upload count=%d, err=%v, table=%q", uploads.Load(), err, table)
+	}
+}
+
+func TestOrgAndAuditLogTableOutput(t *testing.T) {
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/org/data":
+			_, _ = io.WriteString(w, `{"id":"org-1","org_email":"ops@example.com","plan":"business","plan_cycle":"monthly","unpaid":false,"sso_enabled":true,"created_at":1704067200000,"plan_data":{"video":{"display_name":"Video Pro"},"image":{"display_name":"Image Pro"}}}`)
+		case "/v1/user/audit-log":
+			_, _ = io.WriteString(w, `{"pagination":{"page":1,"page_size":10,"total_pages":2,"total":15},"data":[{"timestamp":1704067200000,"activity":"Video Uploaded","action_user":"ops@example.com","status_code":200,"ip":"192.0.2.99","source":{"id":"asset-1","type":"asset"}}]}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer api.Close()
+
+	orgOut, _, err := runCLI(t, api.URL, "", "org", "get", "-o", "table")
+	if err != nil || !strings.Contains(orgOut, "org-1") || !strings.Contains(orgOut, "Video Pro") || !strings.Contains(orgOut, "2024-01-01 00:00 UTC") {
+		t.Fatalf("org table = %q, err = %v", orgOut, err)
+	}
+
+	auditOut, _, err := runCLI(t, api.URL, "", "audit-log", "list", "--start-at", "2026-08-01", "--end-at", "2026-08-31", "-o", "table")
+	if err != nil || !strings.Contains(auditOut, "Video Uploaded") || !strings.Contains(auditOut, "More results are available") || strings.Contains(auditOut, "192.0.2.99") {
+		t.Fatalf("audit-log table = %q, err = %v", auditOut, err)
 	}
 }
