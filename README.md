@@ -4,10 +4,32 @@ Manage [Gumlet](https://www.gumlet.com) video workspaces, assets, playlists, liv
 
 ## Install
 
-**Homebrew** (macOS):
+**Homebrew** (macOS, Linux):
 
 ```sh
 brew install --cask gumlet/tap/gumlet
+```
+
+**Shell script** (macOS, Linux):
+
+```sh
+curl -fsSL https://cli.gumlet.com/install.sh | sh
+```
+
+Optional environment variables: `GUMLET_VERSION` (e.g. `1.0.1`) and `GUMLET_INSTALL_DIR` (defaults to `/usr/local/bin` when writable, otherwise `~/.local/bin`).
+
+**Windows** (PowerShell, WinGet, or Scoop):
+
+```powershell
+# PowerShell
+irm https://cli.gumlet.com/install.ps1 | iex
+
+# WinGet
+winget install Gumlet.CLI
+
+# Scoop
+scoop bucket add gumlet https://github.com/gumlet/scoop-bucket
+scoop install gumlet/gumlet
 ```
 
 **npm** (macOS, Linux, Windows):
@@ -16,7 +38,9 @@ brew install --cask gumlet/tap/gumlet
 npm install -g @gumlet/cli
 ```
 
-**Manual download:** Download the archive for your OS/architecture (`x86_64` or `arm64`) from [GitHub Releases](https://github.com/gumlet/cli/releases), verify against `checksums.txt`, and place `gumlet` on your `PATH`.
+**Debian / Ubuntu (`.deb`) & RHEL / Fedora (`.rpm`):** Download the package for your architecture (`amd64` or `arm64`) from [GitHub Releases](https://github.com/gumlet/cli/releases) and install with `sudo dpkg -i gumlet_*.deb` or `sudo rpm -i gumlet_*.rpm`.
+
+**Manual download:** Download the archive for your OS/architecture (`x86_64` or `arm64` for macOS, Linux, or Windows) from [GitHub Releases](https://github.com/gumlet/cli/releases), verify against `checksums.txt`, and place `gumlet` on your `PATH`.
 
 Verify with `gumlet --version`.
 

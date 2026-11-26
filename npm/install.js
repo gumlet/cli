@@ -27,6 +27,7 @@ const ARCHIVES = new Map([
   ["linux/x64", "gumlet_linux_x86_64.tar.gz"],
   ["linux/arm64", "gumlet_linux_arm64.tar.gz"],
   ["win32/x64", "gumlet_windows_x86_64.zip"],
+  ["win32/arm64", "gumlet_windows_arm64.zip"],
 ]);
 
 function platformArchive(platform = process.platform, arch = process.arch) {

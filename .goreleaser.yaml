@@ -19,9 +19,6 @@ builds:
     goarch:
       - amd64
       - arm64
-    ignore:
-      - goos: windows
-        goarch: arm64
     ldflags:
       - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
 
@@ -74,8 +71,66 @@ homebrew_casks:
     repository:
       owner: gumlet
       name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+      token: "{{ .Env.RELEASE_PUBLISH_GITHUB_TOKEN }}"
     directory: Casks
     homepage: https://www.gumlet.com
     description: Gumlet CLI – manage video and image assets from the command line
     license: Apache-2.0
+
+nfpms:
+  - id: gumlet
+    package_name: gumlet
+    ids:
+      - gumlet
+    vendor: Gumlet Pte. Ltd.
+    homepage: https://www.gumlet.com
+    maintainer: Gumlet <support@gumlet.com>
+    description: Gumlet CLI – manage video and image assets from the command line
+    license: Apache-2.0
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+
+scoops:
+  - name: gumlet
+    homepage: https://www.gumlet.com
+    description: Gumlet CLI – manage video and image assets from the command line
+    license: Apache-2.0
+    skip_upload: '{{ if isEnvSet "RELEASE_PUBLISH_GITHUB_TOKEN" }}auto{{ else }}true{{ end }}'
+    repository:
+      owner: gumlet
+      name: scoop-bucket
+      token: "{{ .Env.RELEASE_PUBLISH_GITHUB_TOKEN }}"
+
+winget:
+  - name: gumlet
+    publisher: Gumlet
+    package_identifier: Gumlet.CLI
+    package_name: Gumlet CLI
+    short_description: Gumlet CLI – manage video and image assets from the command line
+    license: Apache-2.0
+    license_url: https://github.com/gumlet/cli/blob/main/LICENSE
+    homepage: https://www.gumlet.com
+    publisher_url: https://www.gumlet.com
+    publisher_support_url: https://github.com/gumlet/cli/issues
+    copyright: Copyright (c) Gumlet Pte. Ltd.
+    release_notes_url: "https://github.com/gumlet/cli/releases/tag/{{ .Tag }}"
+    tags:
+      - gumlet
+      - cli
+      - video
+      - image
+      - cdn
+    skip_upload: '{{ if isEnvSet "RELEASE_PUBLISH_GITHUB_TOKEN" }}auto{{ else }}true{{ end }}'
+    repository:
+      owner: gumlet
+      name: winget-pkgs
+      branch: "gumlet-{{ .Version }}"
+      token: "{{ .Env.RELEASE_PUBLISH_GITHUB_TOKEN }}"
+      pull_request:
+        enabled: true
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master

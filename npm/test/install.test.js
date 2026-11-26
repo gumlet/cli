@@ -18,6 +18,7 @@ const versions = [
   ["darwin", "x64", "gumlet_darwin_x86_64.tar.gz"],
   ["linux", "arm64", "gumlet_linux_arm64.tar.gz"],
   ["linux", "x64", "gumlet_linux_x86_64.tar.gz"],
+  ["win32", "arm64", "gumlet_windows_arm64.zip"],
   ["win32", "x64", "gumlet_windows_x86_64.zip"],
 ];
 let workspace;
@@ -48,7 +49,7 @@ test("only selects platforms built by GoReleaser", async () => {
   for (const [platform, arch, name] of versions) assert.equal(platformArchive(platform, arch), name);
   const restore = mockHTTPS(() => assert.fail("unsupported platform made a request"));
   try {
-    for (const [platform, arch] of [["win32", "arm64"], ["linux", "ia32"], ["freebsd", "x64"]]) {
+    for (const [platform, arch] of [["win32", "ia32"], ["linux", "ia32"], ["freebsd", "x64"]]) {
       await assert.rejects(install({ platform, arch, binDir: path.join(workspace, "bin") }),
         { message: `Unsupported platform: ${platform}/${arch}` });
     }

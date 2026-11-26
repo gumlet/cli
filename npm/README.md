@@ -13,10 +13,10 @@ npm install -g @gumlet/cli
 ```
 
 Requires Node.js 14.14 or later. The installer downloads and verifies the
-matching binary from GitHub Releases. macOS and Linux support x86-64 and
-ARM64; Windows supports x86-64.
+matching binary from GitHub Releases. Supports x86-64 and ARM64 on macOS,
+Linux, and Windows.
 
-**Homebrew — macOS**
+**Homebrew — macOS and Linux**
 
 ```sh
 brew install --cask gumlet/tap/gumlet
